@@ -1,0 +1,29 @@
+{
+  "name": "jiki-code-videos",
+  "version": "0.1.0",
+  "description": "Code screen video generator for Jiki programming language videos",
+  "scripts": {
+    "dev": "remotion preview",
+    "build": "remotion bundle",
+    "render": "tsx scripts/render.ts",
+    "render:all": "tsx scripts/renderAll.ts"
+  },
+  "packageManager": "pnpm@10.10.0",
+  "dependencies": {
+    "@remotion/bundler": "^4.0.357",
+    "@remotion/cli": "^4.0.357",
+    "@remotion/media-utils": "^4.0.357",
+    "@remotion/renderer": "^4.0.357",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-syntax-highlighter": "^15.6.6",
+    "remotion": "^4.0.357"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.1",
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

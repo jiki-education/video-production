@@ -1,0 +1,29 @@
+{
+  "title": "Multiple Speeds Example",
+  "description": "Fast boilerplate, slow for important concepts",
+  "actions": [
+    {
+      "type": "type",
+      "code": "// Setup code (fast)\nconst numbers = [1, 2, 3];",
+      "speed": ["fast", "fast"]
+    },
+    {
+      "type": "pause",
+      "duration": 0.3
+    },
+    {
+      "type": "type",
+      "code": "// Key concept (slow)\nlet total = 0;",
+      "speed": ["normal", "slow"]
+    },
+    {
+      "type": "pause",
+      "duration": 0.5
+    },
+    {
+      "type": "type",
+      "code": "// Rest of code (normal)\nfor (let num of numbers) {\n  total += num;\n}",
+      "speed": "normal"
+    }
+  ]
+}

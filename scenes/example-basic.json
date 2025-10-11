@@ -1,0 +1,13 @@
+{
+  "title": "Basic Variable Example",
+  "description": "Shows how to declare a variable in JikiScript",
+  "theme": "dark",
+  "actions": [
+    {
+      "type": "type",
+      "code": "let greeting = \"Hello World\";",
+      "speed": "normal",
+      "language": "javascript"
+    }
+  ]
+}

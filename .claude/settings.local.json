@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/iHiD/Code/jiki/overview/**)",
+      "Bash(cat:*)",
+      "Bash(pnpm init)",
+      "Bash(pnpm add:*)",
+      "Bash(ffmpeg:*)",
+      "Bash(tree:*)",
+      "Bash(pnpm dev)",
+      "Bash(pnpm render:*)",
+      "Bash(ffprobe:*)",
+      "Bash(git init:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

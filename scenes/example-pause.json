@@ -1,0 +1,28 @@
+{
+  "title": "Function Definition",
+  "actions": [
+    {
+      "type": "type",
+      "code": "function add(a, b) {",
+      "speed": "normal"
+    },
+    {
+      "type": "pause",
+      "duration": 0.5
+    },
+    {
+      "type": "type",
+      "code": "  return a + b;",
+      "speed": "normal"
+    },
+    {
+      "type": "pause",
+      "duration": 0.5
+    },
+    {
+      "type": "type",
+      "code": "}",
+      "speed": "normal"
+    }
+  ]
+}
