@@ -3,6 +3,7 @@
 ## Context
 
 ### Project Overview
+
 Jiki is a programming language learning platform that requires approximately **50 educational videos** to be produced in **10+ languages**, resulting in **500+ total video renders**. Each video is 10-15 minutes long and consists of three main components:
 
 1. **Talking heads** - Instructor (modeled on Jeremy) explaining concepts
@@ -22,18 +23,21 @@ From extensive research documented in `video/` directory:
 **Pipeline Orchestration:** Cloudflare Workflows + FFmpeg (~$20-35/mo) - Just GA'd June 2025, serverless, TypeScript-based
 
 ### Technical Stack
+
 - **Primary:** Next.js, React, TypeScript, Bun
 - **Infrastructure:** Cloudflare (Workers, R2, Workflows)
 - **Video Generation:** Remotion (React-based programmatic video)
 - **Target:** YouTube educational content at 30fps, 1920x1080
 
 ### Code Screen Requirements
+
 - Attractive and themeable
 - Animatable (character-by-character typing, line highlighting)
 - Scriptable (JSON-driven for 500+ videos)
 - Support for JikiScript syntax (JavaScript-like)
 
 ### Animation Specifications
+
 - **Frame Rate:** 30fps (YouTube standard for educational content)
 - **Typing Speed:**
   - Slow: 10 chars/sec (1 char every 3 frames) - for emphasis
@@ -47,6 +51,7 @@ From extensive research documented in `video/` directory:
 ## Repository Structure
 
 ### Location
+
 `/Users/iHiD/Code/jiki/code-videos`
 
 Parallel to the `overview` repository, keeping concerns separated.
@@ -100,7 +105,9 @@ code-videos/
 ## Phase 1: MVP Implementation
 
 ### Goal
+
 Create a working proof-of-concept that can:
+
 - Render up to 5 lines of JavaScript code
 - Animate character-by-character typing
 - Play keypress sound on each character
@@ -113,17 +120,17 @@ Create a working proof-of-concept that can:
 ```typescript
 // src/lib/types.ts
 
-export type TypingSpeed = 'slow' | 'normal' | 'fast';
+export type TypingSpeed = "slow" | "normal" | "fast";
 
 export interface TypeAction {
-  type: 'type';
+  type: "type";
   code: string;
   speed: TypingSpeed | TypingSpeed[]; // Single speed or per-line speeds
   language?: string; // Default: 'javascript'
 }
 
 export interface PauseAction {
-  type: 'pause';
+  type: "pause";
   duration: number; // In seconds
 }
 
@@ -133,7 +140,7 @@ export interface SceneConfig {
   title: string;
   description?: string;
   backgroundColor?: string;
-  theme?: 'dark' | 'light'; // Default: 'dark'
+  theme?: "dark" | "light"; // Default: 'dark'
   actions: Action[];
 }
 ```
@@ -141,6 +148,7 @@ export interface SceneConfig {
 ### Example JSON Configurations
 
 **scenes/example-basic.json** - Simple typing at normal speed
+
 ```json
 {
   "title": "Basic Variable Example",
@@ -158,6 +166,7 @@ export interface SceneConfig {
 ```
 
 **scenes/example-pause.json** - Typing with pauses between lines
+
 ```json
 {
   "title": "Function Definition",
@@ -190,6 +199,7 @@ export interface SceneConfig {
 ```
 
 **scenes/example-speeds.json** - Different speeds for different lines
+
 ```json
 {
   "title": "Multiple Speeds Example",
@@ -229,6 +239,7 @@ export interface SceneConfig {
 ### Step 1: Repository Setup
 
 **Initialize project:**
+
 ```bash
 cd /Users/iHiD/Code/jiki
 mkdir code-videos
@@ -253,6 +264,7 @@ bun add @remotion/media-utils
 ```
 
 **package.json scripts:**
+
 ```json
 {
   "name": "jiki-code-videos",
@@ -281,15 +293,17 @@ bun add @remotion/media-utils
 ```
 
 **remotion.config.ts:**
-```typescript
-import { Config } from '@remotion/cli/config';
 
-Config.setVideoImageFormat('jpeg');
+```typescript
+import { Config } from "@remotion/cli/config";
+
+Config.setVideoImageFormat("jpeg");
 Config.setOverwriteOutput(true);
 Config.setConcurrency(4);
 ```
 
 **tsconfig.json:**
+
 ```json
 {
   "compilerOptions": {
@@ -316,6 +330,7 @@ Config.setConcurrency(4);
 ```
 
 **.gitignore:**
+
 ```
 node_modules/
 out/
@@ -330,18 +345,19 @@ dist/
 ### Step 2: Core Implementation
 
 **src/lib/types.ts** - Type definitions
+
 ```typescript
-export type TypingSpeed = 'slow' | 'normal' | 'fast';
+export type TypingSpeed = "slow" | "normal" | "fast";
 
 export interface TypeAction {
-  type: 'type';
+  type: "type";
   code: string;
   speed: TypingSpeed | TypingSpeed[];
   language?: string;
 }
 
 export interface PauseAction {
-  type: 'pause';
+  type: "pause";
   duration: number; // seconds
 }
 
@@ -351,42 +367,40 @@ export interface SceneConfig {
   title: string;
   description?: string;
   backgroundColor?: string;
-  theme?: 'dark' | 'light';
+  theme?: "dark" | "light";
   actions: Action[];
 }
 
 export const CHARS_PER_SECOND: Record<TypingSpeed, number> = {
-  slow: 10,   // 1 char every 3 frames at 30fps
+  slow: 10, // 1 char every 3 frames at 30fps
   normal: 15, // 1 char every 2 frames at 30fps
-  fast: 25,   // 1 char every 1.2 frames at 30fps
+  fast: 25 // 1 char every 1.2 frames at 30fps
 };
 ```
 
 **src/lib/timing.ts** - Timing calculations
+
 ```typescript
-import { CHARS_PER_SECOND, TypingSpeed, Action } from './types';
+import { CHARS_PER_SECOND, TypingSpeed, Action } from "./types";
 
 export function getCharsPerSecond(speed: TypingSpeed): number {
   return CHARS_PER_SECOND[speed];
 }
 
-export function calculateActionDuration(
-  action: Action,
-  fps: number
-): number {
-  if (action.type === 'pause') {
+export function calculateActionDuration(action: Action, fps: number): number {
+  if (action.type === "pause") {
     return action.duration * fps;
   }
 
-  if (action.type === 'type') {
-    const lines = action.code.split('\n');
+  if (action.type === "type") {
+    const lines = action.code.split("\n");
     let totalChars = action.code.length;
 
     if (Array.isArray(action.speed)) {
       // Different speed per line
       let totalTime = 0;
       lines.forEach((line, index) => {
-        const speed = action.speed[index] || 'normal';
+        const speed = action.speed[index] || "normal";
         const charsPerSec = getCharsPerSecond(speed as TypingSpeed);
         totalTime += line.length / charsPerSec;
       });
@@ -401,14 +415,8 @@ export function calculateActionDuration(
   return 0;
 }
 
-export function calculateSceneDuration(
-  actions: Action[],
-  fps: number
-): number {
-  return actions.reduce(
-    (total, action) => total + calculateActionDuration(action, fps),
-    0
-  );
+export function calculateSceneDuration(actions: Action[], fps: number): number {
+  return actions.reduce((total, action) => total + calculateActionDuration(action, fps), 0);
 }
 
 interface ActionTiming {
@@ -417,10 +425,7 @@ interface ActionTiming {
   endFrame: number;
 }
 
-export function calculateActionTimings(
-  actions: Action[],
-  fps: number
-): ActionTiming[] {
+export function calculateActionTimings(actions: Action[], fps: number): ActionTiming[] {
   let currentFrame = 0;
   const timings: ActionTiming[] = [];
 
@@ -429,7 +434,7 @@ export function calculateActionTimings(
     timings.push({
       action,
       startFrame: currentFrame,
-      endFrame: currentFrame + duration,
+      endFrame: currentFrame + duration
     });
     currentFrame += duration;
   }
@@ -439,6 +444,7 @@ export function calculateActionTimings(
 ```
 
 **src/lib/audio.ts** - Audio management
+
 ```typescript
 import { Audio, staticFile } from 'remotion';
 
@@ -475,6 +481,7 @@ export function generateKeypressSounds(
 ```
 
 **src/components/AnimatedCode.tsx** - Main code animation component
+
 ```typescript
 import React from 'react';
 import { useCurrentFrame, useVideoConfig } from 'remotion';
@@ -585,6 +592,7 @@ export const AnimatedCode: React.FC<AnimatedCodeProps> = ({
 ```
 
 **src/compositions/CodeScene.tsx** - Main scene composition
+
 ```typescript
 import React from 'react';
 import { AbsoluteFill, Sequence } from 'remotion';
@@ -653,6 +661,7 @@ export const CodeScene: React.FC<CodeSceneProps> = ({ config }) => {
 ```
 
 **src/Root.tsx** - Remotion root
+
 ```typescript
 import React from 'react';
 import { Composition } from 'remotion';
@@ -682,9 +691,10 @@ export const RemotionRoot: React.FC = () => {
 ```
 
 **src/index.ts** - Entry point
+
 ```typescript
-import { registerRoot } from 'remotion';
-import { RemotionRoot } from './Root';
+import { registerRoot } from "remotion";
+import { RemotionRoot } from "./Root";
 
 registerRoot(RemotionRoot);
 ```
@@ -696,12 +706,14 @@ registerRoot(RemotionRoot);
 **Keypress Sound:**
 
 Option 1: Generate using online tool
+
 - Visit: https://sfxr.me/ or https://www.zapsplat.com/
 - Search for "keyboard click" or "keypress"
 - Download as MP3
 - Place in `src/assets/sounds/keypress.mp3`
 
 Option 2: Use a simple mechanical keyboard sound
+
 - Record a single keypress
 - Or find free sound effect online (freesound.org)
 - Normalize to consistent volume
@@ -714,55 +726,57 @@ Option 2: Use a simple mechanical keyboard sound
 ### Step 4: Rendering Scripts
 
 **scripts/render.ts** - Render a single scene
+
 ```typescript
-import { bundle } from '@remotion/bundler';
-import { renderMedia, selectComposition } from '@remotion/renderer';
-import { readFile } from 'fs/promises';
-import { join } from 'path';
+import { bundle } from "@remotion/bundler";
+import { renderMedia, selectComposition } from "@remotion/renderer";
+import { readFile } from "fs/promises";
+import { join } from "path";
 
 async function renderScene(sceneName: string) {
   console.log(`📦 Bundling Remotion project...`);
 
   const bundled = await bundle({
-    entryPoint: join(process.cwd(), 'src/index.ts'),
+    entryPoint: join(process.cwd(), "src/index.ts")
   });
 
   console.log(`🎬 Rendering scene: ${sceneName}`);
 
   const composition = await selectComposition({
     serveUrl: bundled,
-    id: sceneName,
+    id: sceneName
   });
 
-  const outputPath = join(process.cwd(), 'out', `${sceneName}.mp4`);
+  const outputPath = join(process.cwd(), "out", `${sceneName}.mp4`);
 
   await renderMedia({
     composition,
     serveUrl: bundled,
-    codec: 'h264',
+    codec: "h264",
     outputLocation: outputPath,
-    verbose: true,
+    verbose: true
   });
 
   console.log(`✅ Rendered to: ${outputPath}`);
 }
 
 // Get scene name from command line args
-const sceneName = process.argv[2] || 'example-basic';
+const sceneName = process.argv[2] || "example-basic";
 renderScene(sceneName).catch(console.error);
 ```
 
 **scripts/renderAll.ts** - Batch render all scenes
+
 ```typescript
-import { bundle } from '@remotion/bundler';
-import { renderMedia, selectComposition, getCompositions } from '@remotion/renderer';
-import { join } from 'path';
+import { bundle } from "@remotion/bundler";
+import { renderMedia, selectComposition, getCompositions } from "@remotion/renderer";
+import { join } from "path";
 
 async function renderAllScenes() {
   console.log(`📦 Bundling Remotion project...`);
 
   const bundled = await bundle({
-    entryPoint: join(process.cwd(), 'src/index.ts'),
+    entryPoint: join(process.cwd(), "src/index.ts")
   });
 
   console.log(`📋 Getting all compositions...`);
@@ -774,14 +788,14 @@ async function renderAllScenes() {
   for (const composition of compositions) {
     console.log(`\n🎬 Rendering: ${composition.id}`);
 
-    const outputPath = join(process.cwd(), 'out', `${composition.id}.mp4`);
+    const outputPath = join(process.cwd(), "out", `${composition.id}.mp4`);
 
     await renderMedia({
       composition,
       serveUrl: bundled,
-      codec: 'h264',
+      codec: "h264",
       outputLocation: outputPath,
-      verbose: false,
+      verbose: false
     });
 
     console.log(`✅ Rendered: ${composition.id}`);
@@ -800,9 +814,11 @@ renderAllScenes().catch(console.error);
 **Manual Testing Steps:**
 
 1. **Preview in browser:**
+
    ```bash
    bun run dev
    ```
+
    - Browser opens at http://localhost:3000
    - Select "example-basic" composition
    - Watch code typing animation
@@ -810,9 +826,11 @@ renderAllScenes().catch(console.error);
    - Check timing feels right
 
 2. **Render single scene:**
+
    ```bash
    bun run render example-basic
    ```
+
    - Check `out/example-basic.mp4` created
    - Open in video player
    - Verify audio and video sync
@@ -829,9 +847,11 @@ renderAllScenes().catch(console.error);
    - No sounds during pauses
 
 5. **Batch render:**
+
    ```bash
    bun run render:all
    ```
+
    - All scenes render without errors
    - Check output files
 
@@ -860,6 +880,7 @@ Phase 1 MVP is complete when:
 Once MVP is working, consider:
 
 ### Additional Actions
+
 - **Highlight** - Highlight specific lines or ranges
 - **Delete** - Animate deleting characters/lines
 - **Replace** - Replace one section with another
@@ -867,6 +888,7 @@ Once MVP is working, consider:
 - **Scroll** - Scroll through longer code
 
 ### Advanced Features
+
 - Multiple code blocks on screen simultaneously
 - Split screen (code + output)
 - Execution visualization (highlight line being "executed")
@@ -878,6 +900,7 @@ Once MVP is working, consider:
 - Transitions between scenes
 
 ### Integration
+
 - API endpoint to trigger renders
 - Webhook notifications when render completes
 - Upload rendered videos to R2 automatically
@@ -886,6 +909,7 @@ Once MVP is working, consider:
 - Queue system for parallel renders
 
 ### Optimizations
+
 - Remotion Lambda for cloud rendering
 - Parallel scene rendering
 - Caching for common components
@@ -897,11 +921,13 @@ Once MVP is working, consider:
 ## Timeline Estimate
 
 **Phase 1 MVP:** 2-3 days
+
 - Day 1: Setup, core implementation
 - Day 2: Audio integration, timing refinement
 - Day 3: Testing, bug fixes, documentation
 
 **Phase 2 (if needed):** 1-2 weeks
+
 - Depends on which enhancements are prioritized
 
 ---
@@ -909,23 +935,27 @@ Once MVP is working, consider:
 ## Notes
 
 ### Keypress Sound Considerations
+
 - Use a subtle, pleasant sound (not loud/annoying)
 - Consider different sounds for different keys (optional enhancement)
 - Volume should be low (~0.2-0.3) so it doesn't overpower narration
 - Ensure sound is short (<100ms) to avoid overlap
 
 ### Performance
+
 - Remotion renders frame-by-frame, so complex scenes take time
 - For 500+ videos, consider Remotion Lambda (cloud rendering)
 - Each 10-second scene at 30fps = 300 frames to render
 - Estimated render time: 10-30 seconds per 10-second clip (local)
 
 ### JikiScript Syntax
+
 - Start with JavaScript syntax highlighting
 - Phase 2: Create custom syntax highlighter for JikiScript
 - Or extend existing highlighter with custom rules
 
 ### Multilingual Support
+
 - Code typically doesn't change between languages
 - Comments might need translation
 - Consider separate action: `comment` with i18n key

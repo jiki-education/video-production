@@ -1,12 +1,12 @@
-import { bundle } from '@remotion/bundler';
-import { renderMedia, selectComposition, getCompositions } from '@remotion/renderer';
-import { join } from 'path';
+import { bundle } from "@remotion/bundler";
+import { renderMedia, getCompositions } from "@remotion/renderer";
+import { join } from "path";
 
 async function renderAllScenes() {
   console.log(`📦 Bundling Remotion project...`);
 
   const bundled = await bundle({
-    entryPoint: join(process.cwd(), 'src/index.ts'),
+    entryPoint: join(process.cwd(), "src/index.ts")
   });
 
   console.log(`📋 Getting all compositions...`);
@@ -18,13 +18,13 @@ async function renderAllScenes() {
   for (const composition of compositions) {
     console.log(`\n🎬 Rendering: ${composition.id}`);
 
-    const outputPath = join(process.cwd(), 'out', `${composition.id}.mp4`);
+    const outputPath = join(process.cwd(), "out", `${composition.id}.mp4`);
 
     await renderMedia({
       composition,
       serveUrl: bundled,
-      codec: 'h264',
-      outputLocation: outputPath,
+      codec: "h264",
+      outputLocation: outputPath
     });
 
     console.log(`✅ Rendered: ${composition.id}`);

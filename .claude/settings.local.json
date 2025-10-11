@@ -10,7 +10,16 @@
       "Bash(pnpm dev)",
       "Bash(pnpm render:*)",
       "Bash(ffprobe:*)",
-      "Bash(git init:*)"
+      "Bash(git init:*)",
+      "Read(//Users/iHiD/Code/jiki/front-end/**)",
+      "Read(//Users/iHiD/Code/jiki/front-end/.husky/**)",
+      "Bash(ln:*)",
+      "Bash(pnpm exec husky:*)",
+      "Bash(chmod:*)",
+      "WebSearch",
+      "Bash(pnpm list:*)",
+      "WebFetch(domain:www.remotion.dev)",
+      "Bash(git log:*)"
     ],
     "deny": [],
     "ask": []
