@@ -21,43 +21,46 @@ Install dependencies:
 pnpm install
 ```
 
-## Audio Setup
-
-**IMPORTANT:** You need to add a keypress sound effect before running the app.
-
-1. Download or create a keypress sound effect (MP3 format, ~50-100ms duration)
-2. Place it at: `public/sounds/keypress.mp3`
-
-Recommended sources for sounds:
-- https://freesound.org/ (search "keyboard click")
-- https://zapsplat.com/
-- Record your own mechanical keyboard
+The keypress sound effect is already included at `src/assets/sounds/keypress.mp3`.
 
 ## Usage
 
-### Preview in Browser
+### Quick Start
 
 ```bash
-pnpm dev
+bin/dev
 ```
 
-Opens Remotion Studio at http://localhost:3000 where you can preview and tweak your compositions.
+This launches Remotion Studio at http://localhost:3001 where you can preview and tweak your compositions in real-time.
 
-### Render Single Scene
+### Available Scripts
 
-```bash
-pnpm render example-basic
-```
+#### Development
 
-Renders a single scene to `out/example-basic.mp4`.
+- **`bin/dev`** - Start Remotion Studio (alias for `pnpm dev`)
+- **`pnpm dev`** - Start Remotion Studio preview server
+- **`pnpm typecheck`** - Run TypeScript type checking
+- **`pnpm lint`** - Run ESLint
+- **`pnpm format`** - Format code with Prettier
+- **`pnpm format:check`** - Check code formatting
 
-### Render All Scenes
+#### Rendering
 
-```bash
-pnpm render:all
-```
+- **`pnpm render <scene-name>`** - Render a single scene to MP4
+  ```bash
+  pnpm render example-basic
+  # Output: out/example-basic.mp4
+  ```
 
-Renders all compositions to the `out/` directory.
+- **`pnpm render:all`** - Render all registered compositions
+  ```bash
+  pnpm render:all
+  # Outputs all scenes to out/ directory
+  ```
+
+#### Other
+
+- **`pnpm build`** - Bundle the Remotion project (used internally by render scripts)
 
 ## Creating Scenes
 
@@ -115,7 +118,8 @@ code-videos/
 │   └── index.ts              # Entry point
 ├── scenes/                    # JSON scene configurations
 ├── scripts/                   # Rendering scripts
-├── public/sounds/            # Audio assets
+├── bin/
+│   └── dev                   # Development server launcher
 └── out/                      # Rendered videos (gitignored)
 ```
 
@@ -129,11 +133,10 @@ code-videos/
 
 ## Next Steps
 
-1. Add keypress sound effect to `public/sounds/keypress.mp3`
-2. Run `pnpm dev` to test the preview
-3. Create your own scene JSON files
-4. Add new compositions to `src/Root.tsx`
-5. Render videos with `pnpm render <scene-name>`
+1. Run `bin/dev` to preview the example scenes
+2. Create your own scene JSON files in `scenes/`
+3. Add new compositions to `src/Root.tsx`
+4. Render videos with `pnpm render <scene-name>`
 
 ## Future Enhancements
 
