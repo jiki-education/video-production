@@ -73,13 +73,18 @@ export const AnimatedCode: React.FC<AnimatedCodeProps> = ({
               language={action.language || 'javascript'}
               style={theme === 'dark' ? vscDarkPlus : undefined}
               customStyle={{
-                fontSize: 32,
-                padding: 40,
-                borderRadius: 8,
+                padding: 80,
+                borderRadius: 16,
                 margin: 0,
-                backgroundColor: theme === 'dark' ? '#1e1e1e' : '#ffffff',
+                backgroundColor: 'transparent',
+                lineHeight: 1.5,
               }}
-              showLineNumbers
+              codeTagProps={{
+                style: {
+                  fontSize: '64px',
+                }
+              }}
+              showLineNumbers={true}
             >
               {visibleCode}
             </SyntaxHighlighter>
@@ -106,13 +111,18 @@ export const AnimatedCode: React.FC<AnimatedCodeProps> = ({
         language={action.language || 'javascript'}
         style={theme === 'dark' ? vscDarkPlus : undefined}
         customStyle={{
-          fontSize: 32,
-          padding: 40,
-          borderRadius: 8,
+          padding: 80,
+          borderRadius: 16,
           margin: 0,
-          backgroundColor: theme === 'dark' ? '#1e1e1e' : '#ffffff',
+          backgroundColor: 'transparent',
+          lineHeight: 1.5,
         }}
-        showLineNumbers
+        codeTagProps={{
+          style: {
+            fontSize: '64px',
+          }
+        }}
+        showLineNumbers={true}
       >
         {visibleCode}
       </SyntaxHighlighter>
