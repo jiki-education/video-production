@@ -1,5 +1,6 @@
 import React from 'react';
-import { Audio, Sequence, staticFile } from 'remotion';
+import { Audio, Sequence } from 'remotion';
+import keypressSound from '../assets/sounds/keypress.mp3';
 
 interface KeypressSoundsProps {
   frames: number[];
@@ -11,7 +12,7 @@ export const KeypressSounds: React.FC<KeypressSoundsProps> = ({ frames }) => {
       {frames.map((frame, index) => (
         <Sequence key={`keypress-${index}`} from={frame} durationInFrames={10}>
           <Audio
-            src={staticFile('sounds/keypress.mp3')}
+            src={keypressSound}
             volume={0.3}
           />
         </Sequence>
