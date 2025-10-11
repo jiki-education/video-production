@@ -1,46 +1,39 @@
-import React from 'react';
-import { AbsoluteFill, Sequence } from 'remotion';
-import { SceneConfig } from '../lib/types';
-import { calculateActionTimings } from '../lib/timing';
-import { AnimatedCode } from '../components/AnimatedCode';
+import React from "react";
+import { AbsoluteFill, Sequence } from "remotion";
+import type { SceneConfig } from "../lib/types";
+import { calculateActionTimings } from "../lib/timing";
+import { AnimatedCode } from "../components/AnimatedCode";
 
-interface CodeSceneProps {
+export type CodeSceneProps = {
   config: SceneConfig;
-}
+};
 
-export const CodeScene: React.FC<CodeSceneProps> = ({ config }) => {
+export const CodeScene: React.FC<CodeSceneProps> = (props) => {
+  const { config } = props;
   const fps = 30;
   const timings = calculateActionTimings(config.actions, fps);
 
   return (
     <AbsoluteFill
       style={{
-        backgroundColor: config.backgroundColor || '#1e1e1e',
+        backgroundColor: config.backgroundColor ?? "#1e1e1e",
         padding: 60,
-        fontFamily: 'monospace',
-        justifyContent: 'center',
-        alignItems: 'center',
+        fontFamily: "monospace",
+        justifyContent: "center",
+        alignItems: "center"
       }}
     >
       {/* Render each action as a sequence */}
       {timings.map((timing, index) => {
-        if (timing.action.type === 'pause') {
+        if (timing.action.type === "pause") {
           // Pause - just hold the current state
           return null;
         }
 
-        if (timing.action.type === 'type') {
+        if (timing.action.type === "type") {
           return (
-            <Sequence
-              key={index}
-              from={timing.startFrame}
-              durationInFrames={timing.endFrame - timing.startFrame}
-            >
-              <AnimatedCode
-                action={timing.action}
-                startFrame={timing.startFrame}
-                theme={config.theme}
-              />
+            <Sequence key={index} from={timing.startFrame} durationInFrames={timing.endFrame - timing.startFrame}>
+              <AnimatedCode action={timing.action} startFrame={timing.startFrame} theme={config.theme} />
             </Sequence>
           );
         }
