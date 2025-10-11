@@ -47,6 +47,7 @@ This launches Remotion Studio at http://localhost:3001 where you can preview and
 #### Rendering
 
 - **`pnpm render <scene-name>`** - Render a single scene to MP4
+
   ```bash
   pnpm render example-basic
   # Output: out/example-basic.mp4

@@ -1,22 +1,18 @@
-import React from 'react';
-import { useCurrentFrame, useVideoConfig } from 'remotion';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { TypeAction, TypingSpeed } from '../lib/types';
-import { getCharsPerSecond } from '../lib/timing';
-import { KeypressSounds } from '../lib/audio.tsx';
+import React from "react";
+import { useCurrentFrame, useVideoConfig } from "remotion";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import type { TypeAction, TypingSpeed } from "../lib/types";
+import { getCharsPerSecond } from "../lib/timing";
+import { KeypressSounds } from "../lib/audio.tsx";
 
 interface AnimatedCodeProps {
   action: TypeAction;
   startFrame: number;
-  theme?: 'dark' | 'light';
+  theme?: "dark" | "light";
 }
 
-export const AnimatedCode: React.FC<AnimatedCodeProps> = ({
-  action,
-  startFrame,
-  theme = 'dark',
-}) => {
+export const AnimatedCode: React.FC<AnimatedCodeProps> = ({ action, startFrame, theme = "dark" }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const relativeFrame = frame - startFrame;
@@ -25,17 +21,15 @@ export const AnimatedCode: React.FC<AnimatedCodeProps> = ({
     return null;
   }
 
-  const lines = action.code.split('\n');
-  const speeds = Array.isArray(action.speed)
-    ? action.speed
-    : Array(lines.length).fill(action.speed);
+  const lines = action.code.split("\n");
+  const speeds = Array.isArray(action.speed) ? action.speed : Array(lines.length).fill(action.speed);
 
   // Pre-calculate all keypress frames
   const allKeypressFrames: number[] = [];
   let calculatedFrames = 0;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const speed = speeds[i] as TypingSpeed || 'normal';
+    const speed = (speeds[i] as TypingSpeed) || "normal";
     const charsPerSec = getCharsPerSecond(speed);
     const framesPerChar = fps / charsPerSec;
 
@@ -50,12 +44,12 @@ export const AnimatedCode: React.FC<AnimatedCodeProps> = ({
     }
   }
 
-  let visibleCode = '';
+  let visibleCode = "";
   let elapsedFrames = 0;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const speed = speeds[i] as TypingSpeed || 'normal';
+    const speed = (speeds[i] as TypingSpeed) || "normal";
     const charsPerSec = getCharsPerSecond(speed);
     const framesPerChar = fps / charsPerSec;
 
@@ -70,18 +64,18 @@ export const AnimatedCode: React.FC<AnimatedCodeProps> = ({
           <>
             <KeypressSounds frames={allKeypressFrames} />
             <SyntaxHighlighter
-              language={action.language || 'javascript'}
-              style={theme === 'dark' ? vscDarkPlus : undefined}
+              language={action.language ?? "javascript"}
+              style={theme === "dark" ? vscDarkPlus : undefined}
               customStyle={{
                 padding: 80,
                 borderRadius: 16,
                 margin: 0,
-                backgroundColor: 'transparent',
-                lineHeight: 1.5,
+                backgroundColor: "transparent",
+                lineHeight: 1.5
               }}
               codeTagProps={{
                 style: {
-                  fontSize: '64px',
+                  fontSize: "64px"
                 }
               }}
               showLineNumbers={true}
@@ -97,7 +91,7 @@ export const AnimatedCode: React.FC<AnimatedCodeProps> = ({
 
     // Add newline if not last line
     if (i < lines.length - 1) {
-      visibleCode += '\n';
+      visibleCode += "\n";
       // Newline also takes a frame
       elapsedFrames += framesPerChar;
     }
@@ -108,18 +102,18 @@ export const AnimatedCode: React.FC<AnimatedCodeProps> = ({
     <>
       <KeypressSounds frames={allKeypressFrames} />
       <SyntaxHighlighter
-        language={action.language || 'javascript'}
-        style={theme === 'dark' ? vscDarkPlus : undefined}
+        language={action.language ?? "javascript"}
+        style={theme === "dark" ? vscDarkPlus : undefined}
         customStyle={{
           padding: 80,
           borderRadius: 16,
           margin: 0,
-          backgroundColor: 'transparent',
-          lineHeight: 1.5,
+          backgroundColor: "transparent",
+          lineHeight: 1.5
         }}
         codeTagProps={{
           style: {
-            fontSize: '64px',
+            fontSize: "64px"
           }
         }}
         showLineNumbers={true}

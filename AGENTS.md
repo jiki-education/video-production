@@ -7,6 +7,7 @@ This repository generates animated code screen videos for Jiki's educational pro
 ## Purpose
 
 Jiki needs approximately 50 educational videos in 10+ languages (500+ total renders). Each video contains:
+
 1. Talking heads (instructor explanations)
 2. Jiki animations (Pixar-style character demonstrations)
 3. **Code screens** ← This repo
@@ -89,16 +90,19 @@ Scenes are defined as JSON files with an array of **actions**:
 **Frame Rate**: 30fps (YouTube standard)
 
 **Timing Calculation** (src/lib/timing.ts):
+
 - Converts character speeds to frames per character
 - Pre-calculates all keypress frame positions
 - Sequences actions with proper start/end frames
 
 **Audio Sync** (src/lib/audio.tsx):
+
 - One `<Sequence>` component per character
 - Each positioned at the exact frame when that character appears
 - Contains an `<Audio>` component playing keypress.mp3
 
 **Rendering** (src/components/AnimatedCode.tsx):
+
 - Uses `useCurrentFrame()` to track current render frame
 - Calculates which characters are visible based on elapsed frames
 - Returns `<SyntaxHighlighter>` with visible code substring
@@ -116,16 +120,16 @@ Scenes are defined as JSON files with an array of **actions**:
 ### Adding a New Scene
 
 1. Create JSON file in `scenes/`:
+
 ```json
 {
   "title": "My Scene",
-  "actions": [
-    { "type": "type", "code": "console.log('Hello');", "speed": "normal" }
-  ]
+  "actions": [{ "type": "type", "code": "console.log('Hello');", "speed": "normal" }]
 }
 ```
 
 2. Register in `src/Root.tsx`:
+
 ```typescript
 import myScene from '../scenes/my-scene.json';
 
@@ -177,9 +181,9 @@ Speeds are defined in `src/lib/types.ts`:
 
 ```typescript
 export const CHARS_PER_SECOND: Record<TypingSpeed, number> = {
-  slow: 10,   // 1 char every 3 frames at 30fps
+  slow: 10, // 1 char every 3 frames at 30fps
   normal: 15, // 1 char every 2 frames at 30fps
-  fast: 25,   // 1 char every 1.2 frames at 30fps
+  fast: 25 // 1 char every 1.2 frames at 30fps
 };
 ```
 
@@ -245,6 +249,7 @@ pnpm render:all
 ## Future Enhancements
 
 See `PLAN.md` Phase 2 for:
+
 - Line highlighting
 - Code deletion/replacement animations
 - Multiple code blocks on screen
