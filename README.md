@@ -1,67 +1,102 @@
-# Jiki Code Videos
+# Jiki Video Production Pipeline
 
-Code screen video generator for Jiki programming language educational videos.
+Complete video production pipeline system for generating Jiki's educational programming videos.
 
 ## Overview
 
-This app generates animated code screens for Jiki's educational video content. It uses Remotion to create React-based programmatic videos with:
+This repository orchestrates the **entire video production workflow** for ~50 educational programming lessons. The system integrates multiple AI services (HeyGen, Veo 3, ElevenLabs) and video generation tools (Remotion, FFmpeg) into a visual, graph-based pipeline editor.
+
+### Two Main Components
+
+**1. Visual Pipeline Editor** (Next.js + React Flow + PostgreSQL)
+
+- Drag-and-drop pipeline designer
+- Real-time execution monitoring
+- Support for talking heads, animations, code screens, audio mixing, video merging
+- PostgreSQL database with JSONB for flexible configuration storage
+
+**2. Code Screen Generator** (Remotion)
 
 - Character-by-character typing animations
 - Configurable typing speeds (slow, normal, fast)
-- Syntax highlighting for code
-- Keypress sound effects
+- Syntax highlighting with keypress sound effects
 - JSON-driven configuration
-- 1920x1080 resolution at 30fps
+- 1920x1080 @ 30fps output
 
 ## Setup
 
-Install dependencies:
+### Prerequisites
+
+- Node.js 18+
+- pnpm
+- PostgreSQL 14+ (local or hosted)
+
+### Installation
 
 ```bash
+# Install dependencies
 pnpm install
-```
 
-The keypress sound effect is already included at `src/assets/sounds/keypress.mp3`.
+# Create .env file with DATABASE_URL
+echo "DATABASE_URL=postgresql://localhost:5432/jiki_video_pipelines" > .env
+
+# Create database (if not exists)
+createdb jiki_video_pipelines
+
+# Initialize database schema
+pnpm db:init
+
+# Seed with example pipelines
+pnpm db:seed
+```
 
 ## Usage
 
-### Quick Start
+### Visual Pipeline Editor
 
 ```bash
-bin/dev
+# Start Next.js development server (port 3065)
+pnpm dev
+
+# Open browser
+open http://localhost:3065
 ```
 
-This launches Remotion Studio at http://localhost:3001 where you can preview and tweak your compositions in real-time.
+Navigate to a pipeline like `http://localhost:3065/pipelines/lesson-001` to view/edit.
+
+### Code Screen Generator (Remotion)
+
+```bash
+# Preview Remotion compositions
+pnpm remotion
+
+# Render single code screen
+pnpm render example-basic
+
+# Render all code screens
+pnpm render:all
+```
 
 ### Available Scripts
 
+#### Pipeline Editor
+
+- **`pnpm dev`** - Start Next.js dev server (port 3065)
+- **`pnpm db:init`** - Initialize database schema
+- **`pnpm db:seed`** - Seed pipelines from `lessons/*/pipeline.json`
+- **`pnpm db:reset`** - Drop and recreate database
+
+#### Code Screens (Remotion)
+
+- **`pnpm remotion`** - Start Remotion Studio (port 3001)
+- **`pnpm render <scene>`** - Render single scene to MP4
+- **`pnpm render:all`** - Render all scenes
+
 #### Development
 
-- **`bin/dev`** - Start Remotion Studio (alias for `pnpm dev`)
-- **`pnpm dev`** - Start Remotion Studio preview server
 - **`pnpm typecheck`** - Run TypeScript type checking
 - **`pnpm lint`** - Run ESLint
 - **`pnpm format`** - Format code with Prettier
-- **`pnpm format:check`** - Check code formatting
-
-#### Rendering
-
-- **`pnpm render <scene-name>`** - Render a single scene to MP4
-
-  ```bash
-  pnpm render example-basic
-  # Output: out/example-basic.mp4
-  ```
-
-- **`pnpm render:all`** - Render all registered compositions
-  ```bash
-  pnpm render:all
-  # Outputs all scenes to out/ directory
-  ```
-
-#### Other
-
-- **`pnpm build`** - Bundle the Remotion project (used internally by render scripts)
 
 ## Creating Scenes
 
@@ -106,45 +141,65 @@ You can specify a single speed for all lines or an array of speeds (one per line
 
 ```
 code-videos/
-├── src/
-│   ├── lib/
-│   │   ├── types.ts          # TypeScript type definitions
-│   │   ├── timing.ts         # Animation timing calculations
-│   │   └── audio.ts          # Audio management
+├── app/                      # Next.js visual pipeline editor
+│   ├── page.tsx              # Pipeline list
+│   └── pipelines/[id]/       # Pipeline editor page
+│
+├── lib/                      # Database operations
+│   ├── db.ts                 # PostgreSQL connection pool
+│   ├── db-operations.ts      # Atomic DB functions
+│   └── db-to-flow.ts         # DB → React Flow converter
+│
+├── src/                      # Remotion code screen generator
 │   ├── components/
-│   │   └── AnimatedCode.tsx  # Core animated code component
+│   │   └── AnimatedCode.tsx  # Character typing animation
 │   ├── compositions/
-│   │   └── CodeScene.tsx     # Main scene composition
-│   ├── Root.tsx              # Remotion root
-│   └── index.ts              # Entry point
-├── scenes/                    # JSON scene configurations
-├── scripts/                   # Rendering scripts
-├── bin/
-│   └── dev                   # Development server launcher
-└── out/                      # Rendered videos (gitignored)
+│   │   └── CodeScene.tsx     # Scene composition
+│   └── lib/                  # Timing, types, audio
+│
+├── scripts/                  # CLI utilities
+│   ├── render.ts             # Render code screens
+│   ├── db-init.ts            # Initialize database
+│   └── db-seed.ts            # Seed from JSON
+│
+├── lessons/                  # Lesson assets & pipeline configs
+│   └── lesson-001/
+│       ├── pipeline.json     # Pipeline definition
+│       ├── scripts/          # Talking head scripts
+│       └── code/             # Code screen configs
+│
+└── scenes/                   # Remotion example scenes
 ```
 
 ## Tech Stack
 
-- **Remotion** - React-based video generation
-- **React** - UI framework
-- **TypeScript** - Type safety
+### Pipeline System
+
+- **Next.js 15** - App Router, Server Components, Server Actions
+- **React Flow 11+** - Visual graph editor
+- **PostgreSQL + JSONB** - Flexible configuration storage
+- **Tailwind CSS 4** - Styling
+
+### Code Screens
+
+- **Remotion 4.0** - React-based video generation
+- **React 19 + TypeScript 5.9** - Type-safe components
 - **react-syntax-highlighter** - Code syntax highlighting
-- **pnpm** - Package manager
+
+## Documentation
+
+- **PIPELINE-PLAN.md** - Complete pipeline architecture and implementation plan
+- **CLAUDE.md** - Agent documentation for AI assistance
+- **README.md** - This file (user-facing overview)
 
 ## Next Steps
 
-1. Run `bin/dev` to preview the example scenes
-2. Create your own scene JSON files in `scenes/`
-3. Add new compositions to `src/Root.tsx`
-4. Render videos with `pnpm render <scene-name>`
+1. **For Pipeline Development:**
+   - Review PIPELINE-PLAN.md for architecture details
+   - Start Next.js dev server: `pnpm dev`
+   - View example pipeline: http://localhost:3065/pipelines/lesson-001
 
-## Future Enhancements
-
-- Line highlighting
-- Code deletion/replacement animations
-- Multiple code blocks on screen
-- Cursor blink animation
-- More language support
-- Custom syntax themes
-- Integration with Cloudflare Workflows
+2. **For Code Screen Development:**
+   - Create scene JSON files in `scenes/`
+   - Preview with Remotion Studio: `pnpm remotion`
+   - Render: `pnpm render <scene-name>`

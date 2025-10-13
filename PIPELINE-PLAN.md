@@ -8,184 +8,706 @@ The pipeline is:
 
 - **Graph-based**: Nodes with dependencies that reference each other
 - **Visual**: React Flow editor for designing and monitoring pipelines
-- **Declarative**: Single JSON file per video defines both the pipeline structure and execution state
+- **PostgreSQL-backed**: Database storage with JSONB support for concurrent access and real-time updates
 - **Composable**: Mix and match different video generation providers
 
 ## Architecture
 
 ### Core Components
 
-1. **Pipeline JSON Format**: Single source of truth for each video (what to generate + current state)
+1. **PostgreSQL Database**: Single source of truth for pipeline structure and execution state
 2. **Visual Editor** (Next.js + React Flow): Design pipelines, edit nodes, monitor progress
 3. **Execution Engine**: Scripts that execute nodes based on dependencies
 4. **Code Screen Generator** (Remotion): Existing functionality, now a pipeline tool
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                     Pipeline JSON File                        │
-│  Single file containing: structure, config, state, metadata   │
-└──────────────────────────────────────────────────────────────┘
-                              ↓
+┌────────────────────────────────────────────────────────────────┐
+│                   PostgreSQL Database                           │
+│  Tables: pipelines, nodes (with JSONB columns)                 │
+│  - Structure: type, inputs, config (UI writes)                 │
+│  - State: status, metadata, output (Executor writes)           │
+└────────────────────────────────────────────────────────────────┘
+                              ↕
         ┌─────────────────────┴─────────────────────┐
         ↓                                           ↓
 ┌──────────────────┐                      ┌──────────────────┐
-│  Visual Editor   │                      │ Execution Engine │
-│  (Next.js App)   │                      │  (CLI Scripts)   │
-│                  │                      │                  │
-│  • View graph    │                      │  • Read JSON     │
-│  • Edit nodes    │                      │  • Execute nodes │
-│  • Monitor state │                      │  • Update state  │
-└──────────────────┘                      └──────────────────┘
+│  Next.js App     │                      │ Execution Engine │
+│                  │                      │  (CLI Scripts)   │
+│  Server Comp:    │                      │                  │
+│  • Read DB       │                      │  • Read DB       │
+│  • Pass to UI    │                      │  • Execute nodes │
+│                  │                      │  • Update status │
+│  Server Actions: │                      └──────────────────┘
+│  • createNode()  │
+│  • connectNodes()│
+│  • updateNode()  │
+└──────────────────┘
 ```
 
 ---
 
-## Pipeline JSON Format
+## Data Storage: PostgreSQL
 
-Each video has a single JSON file (e.g., `lessons/lesson-001/pipeline.json`) that serves as both:
+### Why PostgreSQL?
 
-- **Pipeline definition**: What nodes exist, how they connect, what they do
-- **Execution state**: Current status, timestamps, costs, output files
+- ✅ **JSONB Support**: Native JSON columns with partial updates and indexing
+- ✅ **Concurrency**: ACID transactions with MVCC handle simultaneous reads/writes
+- ✅ **No conflicts**: UI edits structure, Executor edits state - different columns
+- ✅ **Fast queries**: Indexed access on JSONB fields for status polling
+- ✅ **Transactions**: Atomic multi-node updates
+- ✅ **Scalable**: Connection pooling for concurrent Next.js requests
 
-### Schema
+### Database Schema
 
-```json
-{
-  "version": "1.0",
-  "id": "lesson-001-variables",
-  "title": "Introduction to Variables",
-  "created": "2025-10-13T10:00:00Z",
-  "updated": "2025-10-13T14:30:00Z",
+```sql
+-- Pipelines table
+CREATE TABLE pipelines (
+  id TEXT PRIMARY KEY,
+  version TEXT NOT NULL DEFAULT '1.0',
+  title TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  config JSONB NOT NULL,      -- { storage: {...}, workingDirectory: "..." }
+  metadata JSONB NOT NULL     -- { totalCost, estimatedTotalCost, progress: {...} }
+);
 
-  "config": {
-    "storage": {
-      "bucket": "jiki-videos",
-      "prefix": "lessons/lesson-001-variables/"
-    },
-    "workingDirectory": "./output"
-  },
+-- Nodes table
+CREATE TABLE nodes (
+  id TEXT NOT NULL,
+  pipeline_id TEXT NOT NULL,
 
-  "nodes": {
-    "intro_script": {
-      "type": "asset",
-      "status": "completed",
-      "asset": {
-        "source": "./scripts/intro.md",
-        "type": "text"
-      },
-      "output": {
-        "type": "text",
-        "file": "./scripts/intro.md"
-      }
-    },
+  -- Structure (editable by UI)
+  type TEXT NOT NULL,        -- 'asset', 'render-code', 'talking-head', etc.
+  inputs JSONB NOT NULL,     -- { "config": "code_config", "segments": ["a", "b"] }
+  config JSONB NOT NULL,     -- { provider: "remotion", compositionId: "..." }
+  asset JSONB,               -- For asset nodes: { source: "...", type: "..." }
 
-    "heygen_intro": {
-      "type": "talking-head",
-      "status": "completed",
-      "inputs": {
-        "script": "intro_script"
-      },
-      "config": {
-        "provider": "heygen",
-        "avatarId": "jeremy-avatar-001",
-        "duration": 60
-      },
-      "metadata": {
-        "startedAt": "2025-10-13T10:15:00Z",
-        "completedAt": "2025-10-13T10:18:00Z",
-        "jobId": "heygen_abc123",
-        "cost": 1.0,
-        "retries": 0
-      },
-      "output": {
-        "type": "video",
-        "localFile": "./output/heygen/intro.mp4",
-        "s3Key": "lessons/lesson-001-variables/heygen/intro.mp4",
-        "duration": 60,
-        "size": 12400000
-      }
-    },
+  -- Execution state (editable by Executor only)
+  status TEXT NOT NULL DEFAULT 'pending',  -- 'pending'|'in_progress'|'completed'|'failed'
+  metadata JSONB,            -- { startedAt, completedAt, jobId, cost, retries }
+  output JSONB,              -- { type, localFile, s3Key, duration, size }
 
-    "code_config": {
-      "type": "asset",
-      "status": "completed",
-      "asset": {
-        "source": "./code/segment-1.json",
-        "type": "json"
-      },
-      "output": {
-        "type": "json",
-        "file": "./code/segment-1.json"
-      }
-    },
+  PRIMARY KEY (pipeline_id, id),
+  FOREIGN KEY (pipeline_id) REFERENCES pipelines(id) ON DELETE CASCADE
+);
 
-    "code_screen": {
-      "type": "render-code",
-      "status": "completed",
-      "inputs": {
-        "config": "code_config"
-      },
-      "config": {
-        "provider": "remotion",
-        "compositionId": "code-scene"
-      },
-      "metadata": {
-        "completedAt": "2025-10-13T11:00:00Z",
-        "retries": 0
-      },
-      "output": {
-        "type": "video",
-        "localFile": "./output/remotion/code-screen.mp4",
-        "duration": 240
-      }
-    },
+CREATE INDEX idx_nodes_status ON nodes(pipeline_id, status);
+CREATE INDEX idx_pipelines_updated ON pipelines(updated_at DESC);
+```
 
-    "final_video": {
-      "type": "merge-videos",
-      "status": "in_progress",
-      "inputs": {
-        "segments": ["heygen_intro", "code_screen"]
-      },
-      "config": {
-        "provider": "ffmpeg",
-        "operation": "concatenate"
-      },
-      "metadata": {
-        "startedAt": "2025-10-13T14:25:00Z",
-        "retries": 0
-      },
-      "output": {
-        "type": "video"
-      }
-    }
-  },
+### Data Example
 
-  "metadata": {
-    "totalCost": 5.3,
-    "estimatedTotalCost": 91.0,
-    "progress": {
-      "completed": 3,
-      "in_progress": 1,
-      "pending": 0,
-      "failed": 0,
-      "total": 4
-    }
-  }
+```sql
+-- Pipeline
+INSERT INTO pipelines (id, version, title, config, metadata) VALUES (
+  'example-pipeline',
+  '1.0',
+  'Example Pipeline',
+  '{"storage":{"bucket":"jiki-videos","prefix":"lessons/example-pipeline/"},"workingDirectory":"./output"}'::jsonb,
+  '{"totalCost":0,"estimatedTotalCost":0,"progress":{"completed":2,"in_progress":0,"pending":1,"failed":0,"total":3}}'::jsonb
+);
+
+-- Node
+INSERT INTO nodes (id, pipeline_id, type, inputs, config, status) VALUES (
+  'code_screen',
+  'example-pipeline',
+  'render-code',
+  '{"config":"code_config"}'::jsonb,
+  '{"provider":"remotion","compositionId":"code-scene"}'::jsonb,
+  'pending'
+);
+```
+
+---
+
+## Atomic Database Operations
+
+All UI interactions map to specific, granular database functions. These functions are defined in `lib/db-operations.ts` and wrapped by Server Actions in `app/pipelines/[id]/actions.ts`.
+
+### Node Operations
+
+**Create Node**
+
+```typescript
+createNode(pipelineId: string, node: {
+  id: string;
+  type: string;
+  inputs: Record<string, string | string[]>;
+  config: Record<string, unknown>;
+  asset?: { source: string; type: string };
+})
+```
+
+- Inserts a new node with `status: 'pending'`
+- Updates pipeline timestamp
+- Used when: User adds node via UI
+
+**Update Node Config**
+
+```typescript
+updateNodeConfig(pipelineId: string, nodeId: string, configUpdates: Record<string, unknown>)
+```
+
+- Updates only changed keys in `config` JSONB using chained `jsonb_set()` calls
+- **Partial update**: Only modifies specified config keys, preserves other config fields
+- Preserves inputs, type, status columns entirely
+- Used when: User edits node settings in EditorPanel
+
+**Update Node Type**
+
+```typescript
+updateNodeType(pipelineId: string, nodeId: string, type: string)
+```
+
+- Changes node type (e.g., "heygen" → "elevenlabs")
+- Used when: User changes provider dropdown
+
+**Delete Node**
+
+```typescript
+deleteNode(pipelineId: string, nodeId: string)
+```
+
+- Removes node from database
+- Cleans up references in other nodes' `inputs`
+- Used when: User presses delete in React Flow
+
+**Duplicate Node**
+
+```typescript
+duplicateNode(pipelineId: string, sourceNodeId: string, newNodeId: string)
+```
+
+- Copies node with new ID
+- Preserves config but starts with `status: 'pending'`
+- Used when: User duplicates node via context menu
+
+### Edge Operations (Dependencies)
+
+**Connect Nodes**
+
+```typescript
+connectNodes(
+  pipelineId: string,
+  sourceNodeId: string,
+  targetNodeId: string,
+  inputKey: string
+)
+```
+
+- Sets `targetNode.inputs[inputKey] = sourceNodeId` using `jsonb_set(inputs, '{inputKey}', ...)`
+- **Partial update**: Only updates the specified input key, preserves other inputs
+- Used when: User drags edge from source to target in React Flow
+
+**Connect to Array Input**
+
+```typescript
+connectNodesToArray(
+  pipelineId: string,
+  sourceNodeId: string,
+  targetNodeId: string,
+  inputKey: string
+)
+```
+
+- Appends to `targetNode.inputs[inputKey][]` array using `jsonb_set(inputs, '{inputKey,-1}', ...)`
+- **Partial update**: Only modifies the array, preserves other inputs
+- Used for multi-input nodes (e.g., `merge-videos.segments[]`)
+- Used when: User connects to "array" input handle
+
+**Disconnect Nodes**
+
+```typescript
+disconnectNodes(pipelineId: string, targetNodeId: string, inputKey: string)
+```
+
+- Removes `targetNode.inputs[inputKey]` using `inputs - 'inputKey'` operator
+- **Partial update**: Only removes the specified key, preserves other inputs
+- Used when: User deletes edge in React Flow
+
+### Pipeline Operations
+
+**Update Pipeline Title**
+
+```typescript
+updatePipelineTitle(pipelineId: string, title: string)
+```
+
+- Updates pipeline name
+- Used when: User edits title in header
+
+**Update Pipeline Config**
+
+```typescript
+updatePipelineConfig(pipelineId: string, configUpdates: Record<string, unknown>)
+```
+
+- Updates only changed keys in `config` JSONB using chained `jsonb_set()` calls
+- **Partial update**: Only modifies specified config keys (e.g., storage.bucket), preserves other config fields
+- Used when: User edits pipeline settings
+
+### Read Operations
+
+**Get Pipeline**
+
+```typescript
+getPipeline(pipelineId: string): Pipeline
+```
+
+- Returns full pipeline row
+- Used in: Server Component page load
+
+**Get Nodes**
+
+```typescript
+getNodes(pipelineId: string): Node[]
+```
+
+- Returns all nodes for pipeline
+- Used in: Server Component page load
+
+**Get Node Statuses**
+
+```typescript
+getNodeStatuses(pipelineId: string): Array<{ id, status, metadata, output }>
+```
+
+- Returns only execution state (not structure)
+- Used in: Status refresh during execution
+
+**Get All Pipelines**
+
+```typescript
+getAllPipelines(): Pipeline[]
+```
+
+- Returns all pipelines sorted by `updated_at`
+- Used in: Index page listing
+
+### Design Principles
+
+1. **Single Responsibility**: Each function does one thing
+2. **Atomic**: All operations are transactional (PostgreSQL ACID)
+3. **Preserves State**: Structure updates never touch execution state
+4. **Partial Updates Only**: Use `jsonb_set()` to update only changed keys, never replace entire JSONB columns
+5. **Clear Intent**: Function name describes exact operation
+6. **Type Safe**: All parameters strongly typed
+
+---
+
+## JSONB Partial Update Strategy
+
+All database operations use PostgreSQL's `jsonb_set()` to update **only the specific keys that changed**, never replacing entire JSONB columns. This is critical for concurrency safety and performance.
+
+### Why Partial Updates Matter
+
+**Concurrency**: Multiple processes can update different keys in the same JSONB column without conflicts.
+
+**Performance**: Smaller updates = less data transfer, faster queries, smaller WAL (Write-Ahead Log).
+
+**Data Integrity**: Preserves unchanged nested data that other processes may have written.
+
+### jsonb_set() Syntax
+
+```sql
+jsonb_set(
+  target JSONB,           -- The JSONB column to update
+  path TEXT[],            -- JSON path as array: '{key}' or '{nested,key}'
+  new_value JSONB,        -- New value (must be valid JSON)
+  create_if_missing BOOL  -- Default true
+)
+```
+
+### Common Update Patterns
+
+**Update Single Top-Level Key:**
+
+```sql
+-- Update config.provider
+UPDATE nodes
+SET config = jsonb_set(config, '{provider}', '"heygen"')
+WHERE pipeline_id = $1 AND id = $2;
+```
+
+**Update Nested Key:**
+
+```sql
+-- Update metadata.progress.completed
+UPDATE pipelines
+SET metadata = jsonb_set(metadata, '{progress,completed}', '5')
+WHERE id = $1;
+```
+
+**Update Multiple Keys (Chain jsonb_set):**
+
+```sql
+-- Update metadata.startedAt AND metadata.jobId
+UPDATE nodes
+SET metadata = jsonb_set(
+  jsonb_set(metadata, '{startedAt}', '"2025-10-13T10:00:00Z"'),
+  '{jobId}', '"job_12345"'
+)
+WHERE pipeline_id = $1 AND id = $2;
+```
+
+**Append to Array:**
+
+```sql
+-- Add node ID to inputs.segments array
+UPDATE nodes
+SET inputs = jsonb_set(
+  inputs,
+  '{segments,-1}',  -- -1 means "after last element"
+  '"new_node_id"'
+)
+WHERE pipeline_id = $1 AND id = $2;
+```
+
+**Remove Key (Use jsonb_set with NULL, then filter):**
+
+```sql
+-- Remove input key (for disconnecting nodes)
+UPDATE nodes
+SET inputs = inputs - 'scriptId'  -- PostgreSQL operator for key removal
+WHERE pipeline_id = $1 AND id = $2;
+```
+
+**Conditional Update (Using COALESCE for defaults):**
+
+```sql
+-- Increment cost, default to 0 if null
+UPDATE pipelines
+SET metadata = jsonb_set(
+  metadata,
+  '{totalCost}',
+  to_jsonb(COALESCE((metadata->>'totalCost')::numeric, 0) + 50)
+)
+WHERE id = $1;
+```
+
+### Implementation Examples
+
+**connectNodes() - Update single input key:**
+
+```typescript
+export async function connectNodes(pipelineId: string, sourceNodeId: string, targetNodeId: string, inputKey: string) {
+  await pool.query(
+    `
+    UPDATE nodes
+    SET inputs = jsonb_set(inputs, $1, to_jsonb($2::text))
+    WHERE pipeline_id = $3 AND id = $4
+  `,
+    [
+      `{${inputKey}}`, // Path as string (pg driver converts to array)
+      sourceNodeId,
+      pipelineId,
+      targetNodeId
+    ]
+  );
 }
 ```
 
-### Key Concepts
+**updateNodeConfig() - Update only changed config keys:**
 
-**Node Structure:**
+```typescript
+export async function updateNodeConfig(pipelineId: string, nodeId: string, configUpdates: Record<string, unknown>) {
+  // Build chained jsonb_set calls for each key
+  const keys = Object.keys(configUpdates);
+  let setClause = "config";
 
-- `type`: Function the node performs (e.g., `talking-head`, `merge-videos`, `render-code`)
-- `status`: Current state (`pending`, `in_progress`, `completed`, `failed`)
-- `inputs`: References to other nodes by ID (defines the dependency graph)
-- `config`: Node-specific configuration including `provider` (implementation details)
-- `metadata`: Execution tracking (timestamps, costs, retries, errors)
-- `output`: Results of execution with standardized `type` field (video, audio, image, text, json)
+  keys.forEach((key, index) => {
+    setClause = `jsonb_set(${setClause}, '{${key}}', $${index + 3})`;
+  });
 
-**Node Types:**
+  const values = keys.map((key) => JSON.stringify(configUpdates[key]));
+
+  await pool.query(
+    `
+    UPDATE nodes
+    SET config = ${setClause}
+    WHERE pipeline_id = $1 AND id = $2
+  `,
+    [pipelineId, nodeId, ...values]
+  );
+}
+```
+
+**Executor - Update metadata fields:**
+
+```typescript
+export async function setNodeExecutionStart(pipelineId: string, nodeId: string, jobId: string) {
+  await pool.query(
+    `
+    UPDATE nodes
+    SET
+      status = 'in_progress',
+      metadata = jsonb_set(
+        jsonb_set(metadata, '{startedAt}', to_jsonb(NOW())),
+        '{jobId}', to_jsonb($3::text)
+      )
+    WHERE pipeline_id = $1 AND id = $2
+  `,
+    [pipelineId, nodeId, jobId]
+  );
+}
+```
+
+### Safety Checklist
+
+✅ **DO:**
+
+- Use `jsonb_set()` for all JSONB column updates
+- Chain multiple `jsonb_set()` calls for multiple keys
+- Use `to_jsonb()` to convert values to JSON
+- Use `-` operator to remove keys
+- Test that unchanged keys are preserved
+
+❌ **DON'T:**
+
+- Never: `SET config = '{"provider": "heygen"}'::jsonb` (replaces entire object)
+- Never: `SET metadata = to_jsonb($1)` with full object (loses other keys)
+- Never: Read-modify-write without transaction for same column
+
+### Performance Notes
+
+- `jsonb_set()` is fast: O(log n) for nested access
+- Indexes work with partial updates (GIN indexes on JSONB paths)
+- Multiple chained `jsonb_set()` calls are still more efficient than full replacement
+- PostgreSQL's MVCC handles concurrent partial updates to different keys seamlessly
+
+---
+
+## Concurrency Strategy
+
+### Field-Level Separation
+
+**UI Edits (Structure):**
+
+- `type`, `inputs`, `config`, `asset`
+- Never touches: `status`, `metadata`, `output`
+
+**Executor Edits (State):**
+
+- `status`, `metadata`, `output`
+- Never touches: `type`, `inputs`, `config`, `asset`
+
+### Update Operations
+
+All JSONB column updates use **partial updates** via `jsonb_set()` to preserve unchanged keys:
+
+```sql
+-- UI Update (structure only) - Update single input key
+UPDATE nodes
+SET inputs = jsonb_set(inputs, '{scriptId}', '"new_script_node"')
+WHERE pipeline_id = $1 AND id = $2;
+
+-- UI Update - Update nested config value
+UPDATE nodes
+SET config = jsonb_set(config, '{provider}', '"heygen"')
+WHERE pipeline_id = $1 AND id = $2;
+
+-- Executor Update (state only) - Update nested metadata
+UPDATE nodes
+SET metadata = jsonb_set(
+  jsonb_set(metadata, '{startedAt}', '"2025-10-13T10:00:00Z"'),
+  '{jobId}', '"job_12345"'
+)
+WHERE pipeline_id = $1 AND id = $2;
+
+-- Executor Update - Update nested progress counter
+UPDATE pipelines
+SET metadata = jsonb_set(metadata, '{progress,completed}', '5')
+WHERE id = $1;
+```
+
+**Safety Rules:**
+
+- ❌ Never: `SET config = '{"provider": "heygen"}'` (replaces entire object)
+- ✅ Always: `SET config = jsonb_set(config, '{provider}', '"heygen"')` (updates single key)
+- This prevents race conditions and preserves unchanged nested data
+
+### Real-time Updates
+
+The UI refreshes status changes using Next.js router refresh:
+
+```typescript
+// Client Component
+"use client";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+
+export function StatusPoller() {
+  const router = useRouter();
+
+  useEffect(() => {
+    // Refresh every 2 seconds while pipeline is running
+    const interval = setInterval(() => {
+      router.refresh(); // Re-runs Server Component, fetches latest from DB
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [router]);
+
+  return null;
+}
+```
+
+The Server Component re-fetches on each refresh:
+
+```typescript
+// Server Component (page.tsx)
+export default async function PipelinePage({ params }) {
+  const { id } = await params;
+
+  // Fresh data on every render
+  const pipeline = db.getPipeline(id);
+  const nodes = db.getNodes(id);
+
+  return <PipelineEditor pipeline={pipeline} nodes={nodes} />;
+}
+```
+
+---
+
+## Visual Editor (Next.js + React Flow)
+
+### Tech Stack
+
+- **Next.js 15** with Turbopack (App Router)
+- **React Flow 11+** (visual graph editor)
+- **TypeScript** (type safety)
+- **Tailwind CSS 4** (styling)
+- **PostgreSQL** (database with JSONB support)
+- **pg** (PostgreSQL client with connection pooling)
+- **dagre** (auto-layout algorithm for left-to-right graphs)
+
+### Layout
+
+```
+┌─────────────────────────────────────────┬──────────────────┐
+│ ← Back          Pipeline Name           │                  │
+├─────────────────────────────────────────┼──────────────────┤
+│                                         │                  │
+│         React Flow Canvas              │   Node Editor    │
+│         (Left-to-right flow)            │   Panel          │
+│                                         │                  │
+│  ┌──────┐      ┌──────┐      ┌──────┐  │   [Node ID]      │
+│  │Asset │─────>│Heygen│─────>│Merge │  │   [Type]         │
+│  └──────┘      └──────┘      └──────┘  │   [Inputs]       │
+│                                         │   [Config]       │
+│  ┌──────┐      ┌──────┐           │    │   [Metadata]     │
+│  │Asset │─────>│Veo3  │───────────┘    │   [Output]       │
+│  └──────┘      └──────┘                 │                  │
+│                                         │   [Actions]      │
+│                                         │                  │
+├─────────────────────────────────────────┴──────────────────┤
+│ [▶️ Run Pipeline] [Validate]         Status: Ready         │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Features
+
+**Node Visualization:**
+
+- Custom components per node type with status-based styling
+- Color-coded borders:
+  - Pending: Gray
+  - In Progress: Blue (animated pulse)
+  - Completed: Green
+  - Failed: Red
+- Display: node ID, type, provider, duration, cost
+- Connection handles (input left, output right)
+
+**Editor Panel:**
+
+- Opens when clicking a node
+- Dynamic forms based on node type
+- Edit inputs, config
+- View metadata, output (read-only)
+- Actions: Save, Delete, Duplicate
+
+**Canvas Controls:**
+
+- Drag nodes to reposition
+- Drag edges to reconnect
+- Zoom/pan with mouse/trackpad
+- Auto-layout with dagre (left-to-right)
+
+---
+
+## Project Structure
+
+```
+code-videos/
+├── PIPELINE-PLAN.md            # This document
+├── README.md
+├── package.json
+├── .env                        # DATABASE_URL (gitignored)
+├── remotion.config.ts
+├── tailwind.config.js
+├── postcss.config.mjs
+│
+├── src/                        # Existing Remotion code screen generator
+│   ├── Root.tsx
+│   ├── compositions/
+│   ├── components/
+│   ├── lib/
+│   └── assets/
+│
+├── scenes/                     # Remotion example scenes
+│
+├── scripts/                    # Remotion render scripts + DB utilities
+│   ├── render.ts
+│   ├── renderAll.ts
+│   ├── db-init.ts              # Initialize database schema
+│   └── db-seed.ts              # Seed database with JSON lessons
+│
+├── app/                        # Next.js visual editor
+│   ├── layout.tsx
+│   ├── globals.css
+│   ├── page.tsx                # Index: list all pipelines
+│   └── pipelines/
+│       └── [id]/
+│           ├── page.tsx        # Main editor (Server Component, loads from DB)
+│           ├── actions.ts      # Server Actions (wrap db-operations)
+│           └── components/
+│               ├── PipelineHeader.tsx
+│               ├── PipelineFooter.tsx
+│               ├── PipelineEditor.tsx  # Client Component (React Flow)
+│               └── EditorPanel.tsx
+│
+├── lib/
+│   ├── db.ts                   # PostgreSQL connection pool
+│   ├── db-migrations.ts        # Schema creation
+│   ├── db-operations.ts        # Atomic DB operations (createNode, connectNodes, etc.)
+│   └── db-to-flow.ts          # DB → React Flow conversion (read-only)
+│
+├── pipeline/                   # Execution engine (future)
+│   ├── types/
+│   │   └── pipeline.ts
+│   ├── scripts/
+│   │   ├── run-pipeline.ts
+│   │   └── run-node.ts
+│   ├── lib/
+│   │   ├── executors/
+│   │   ├── providers/
+│   │   └── state.ts            # DB update functions
+│   └── config/
+│
+├── lessons/                    # Asset storage only
+│   └── lesson-001/
+│       ├── scripts/
+│       ├── prompts/
+│       ├── code/
+│       └── output/
+│
+└── shared/
+    └── assets/
+```
+
+---
+
+## Node Types
 
 | Type                 | Description                  | Example Providers  |
 | -------------------- | ---------------------------- | ------------------ |
@@ -200,411 +722,131 @@ Each video has a single JSON file (e.g., `lessons/lesson-001/pipeline.json`) tha
 
 ---
 
-## Visual Editor (Next.js + React Flow)
+## Implementation Status
 
-### Purpose
+### ✅ Completed
 
-A web-based visual editor for:
+#### Phase 1: Foundation
 
-- Designing video pipelines by connecting nodes
-- Editing node configurations
-- Monitoring execution progress in real-time
-- Triggering pipeline execution
+- [x] Next.js 15 app with App Router and Turbopack
+- [x] Tailwind CSS 4 configuration
+- [x] Page layout with header, footer, split panels
+- [x] Component structure (Header, Footer, FlowCanvas, EditorPanel)
+- [x] Index page for listing pipelines
+- [x] Pipeline show page with JSON display
+- [x] Example pipeline JSON (will migrate to DB)
 
-### Tech Stack
+### 🚧 In Progress
 
-- **Next.js 14+** (App Router)
-- **React Flow 11+** (visual graph editor)
-- **TypeScript** (type safety)
-- **Tailwind CSS** (styling)
-- **Zustand** (state management)
-- **dagre** (auto-layout algorithm for left-to-right graphs)
-- **zod** (JSON schema validation)
+#### Phase 2: PostgreSQL Integration
 
-### Layout
+- [x] Install `pg` and `@types/pg`
+- [x] Create database schema and migrations
+- [x] Set up DB connection pool
+- [x] Create atomic DB operation functions (createNode, deleteNode, connectNodes)
+- [x] Seed script to load JSON lessons into database (for development/testing)
+- [ ] Add remaining operations (updateNodeConfig, duplicateNode, etc.)
 
-```
-┌─────────────────────────────────────────┬──────────────────┐
-│                                         │                  │
-│         React Flow Canvas              │   Node Editor    │
-│         (Left-to-right flow)            │   Panel          │
-│                                         │                  │
-│  ┌──────┐      ┌──────┐      ┌──────┐  │   [Node ID]      │
-│  │Asset │─────>│Heygen│─────>│Merge │  │   [Type]         │
-│  └──────┘      └──────┘      └──────┘  │   [Inputs]       │
-│                                         │   [Config]       │
-│  ┌──────┐      ┌──────┐           │    │   [Metadata]     │
-│  │Asset │─────>│Veo3  │───────────┘    │   [Output]       │
-│  └──────┘      └──────┘                 │                  │
-│                                         │   [Actions]      │
-│  Controls: [▶️ Run] [⏸️ Pause] [🔍]     │                  │
-└─────────────────────────────────────────┴──────────────────┘
-```
+#### Phase 3: React Flow Visualization
 
-### Features
+- [ ] Install `reactflow` and `dagre`
+- [ ] Create DB → React Flow converter (read-only helper)
+- [ ] Create Server Actions wrapping atomic DB operations
+- [ ] Update PipelineEditor with React Flow (Client Component)
+- [ ] Create custom node components
+- [ ] Implement auto-layout with dagre
+- [ ] Add node selection handler
+- [ ] Update EditorPanel with selected node form
+- [ ] Wire up React Flow callbacks to Server Actions (onConnect, onNodeDelete, etc.)
 
-**Node Visualization:**
+#### Phase 4: Interactive UI & State Management
 
-- Custom components per node type with status-based styling
-- Color-coded status indicators:
-  - Pending: Gray
-  - In Progress: Blue (animated pulse)
-  - Completed: Green with checkmark
-  - Failed: Red with error icon
-- Display key info: provider, duration, cost
-- Connection handles showing data flow
+- [ ] Implement useTransition for optimistic updates
+- [ ] Add loading states during Server Action calls
+- [ ] Implement periodic status refresh with router.refresh()
+- [ ] Add manual refresh button for status updates
+- [ ] Handle Server Action errors with error boundaries
+- [ ] Add toast notifications for successful operations
 
-**Editor Panel:**
+### 📋 Planned
 
-- Opens when clicking a node
-- Dynamic forms based on node type
-- Edit inputs, config, metadata
-- View output details
-- Actions: Save, Delete, Duplicate, Run Node
-
-**Canvas Controls:**
-
-- Zoom/pan with mouse/trackpad
-- Auto-layout with dagre (left-to-right)
-- Minimap for navigation
-- Export graph to PNG
-
----
-
-## Project Structure
-
-```
-code-videos/
-├── PIPELINE-PLAN.md            # This document
-├── README.md                   # Quick start guide
-├── package.json
-├── remotion.config.ts
-│
-├── remotion/                   # Code screen generator (existing Remotion app)
-│   ├── src/
-│   │   ├── Root.tsx
-│   │   ├── compositions/
-│   │   │   └── CodeScene.tsx
-│   │   ├── components/
-│   │   │   └── AnimatedCode.tsx
-│   │   ├── lib/
-│   │   │   ├── types.ts
-│   │   │   ├── timing.ts
-│   │   │   └── audio.ts
-│   │   └── assets/
-│   │       └── sounds/
-│   │           └── keypress.mp3
-│   ├── scenes/                 # Example JSON configs for code scenes
-│   └── scripts/
-│       ├── render.ts           # Render single scene
-│       └── renderAll.ts        # Render all scenes
-│
-├── editor/                     # Visual pipeline editor (NEW)
-│   ├── package.json
-│   ├── next.config.js
-│   ├── tsconfig.json
-│   ├── app/
-│   │   ├── layout.tsx
-│   │   ├── page.tsx            # Landing: list all pipelines
-│   │   ├── pipeline/
-│   │   │   └── [id]/
-│   │   │       └── page.tsx    # Main editor view
-│   │   └── api/
-│   │       ├── pipeline/[id]/
-│   │       │   └── route.ts    # GET/PUT pipeline JSON
-│   │       └── execute/
-│   │           └── route.ts    # POST to run pipeline/node
-│   ├── components/
-│   │   ├── PipelineFlow.tsx    # React Flow canvas
-│   │   ├── NodeEditor.tsx      # Right-side editor panel
-│   │   ├── nodes/              # Custom node components
-│   │   │   ├── AssetNode.tsx
-│   │   │   ├── TalkingHeadNode.tsx
-│   │   │   ├── AnimationNode.tsx
-│   │   │   ├── RenderCodeNode.tsx
-│   │   │   └── MergeVideosNode.tsx
-│   │   └── editors/            # Node-specific editors
-│   │       ├── AssetEditor.tsx
-│   │       ├── TalkingHeadEditor.tsx
-│   │       └── ...
-│   ├── lib/
-│   │   ├── pipelineLoader.ts   # Load/save pipeline JSON
-│   │   ├── layoutEngine.ts     # Dagre auto-layout
-│   │   └── validation.ts       # Validate dependencies
-│   └── hooks/
-│       ├── usePipeline.ts      # Pipeline state management
-│       └── useNodeEditor.ts    # Editor panel state
-│
-├── pipeline/                   # Execution engine (NEW)
-│   ├── types/
-│   │   └── pipeline.ts         # TypeScript types for JSON schema
-│   │
-│   ├── scripts/
-│   │   ├── run-pipeline.ts     # Execute entire pipeline
-│   │   ├── run-node.ts         # Execute single node
-│   │   ├── validate.ts         # Validate pipeline JSON
-│   │   └── status.ts           # Show pipeline progress
-│   │
-│   ├── lib/
-│   │   ├── executors/          # Node type executors
-│   │   │   ├── asset.ts
-│   │   │   ├── talking-head.ts
-│   │   │   ├── generate-animation.ts
-│   │   │   ├── generate-voiceover.ts
-│   │   │   ├── render-code.ts      # Wraps Remotion
-│   │   │   ├── mix-audio.ts
-│   │   │   ├── merge-videos.ts
-│   │   │   └── compose-video.ts
-│   │   │
-│   │   ├── providers/          # Service integrations
-│   │   │   ├── heygen.ts
-│   │   │   ├── veo3.ts
-│   │   │   ├── elevenlabs.ts
-│   │   │   ├── ffmpeg.ts
-│   │   │   └── remotion.ts     # Calls existing Remotion renderer
-│   │   │
-│   │   ├── storage.ts          # S3/R2 upload/download
-│   │   ├── state.ts            # JSON read/write with locking
-│   │   └── graph.ts            # Dependency resolution
-│   │
-│   └── config/
-│       └── providers.json      # API keys, endpoints, etc.
-│
-├── lessons/                    # Lesson content
-│   ├── lesson-001-variables/
-│   │   ├── pipeline.json       # THE single source of truth
-│   │   ├── scripts/
-│   │   │   ├── intro.md
-│   │   │   └── narration-1.md
-│   │   ├── prompts/
-│   │   │   └── scene-1.md
-│   │   ├── code/
-│   │   │   └── segment-1.json
-│   │   └── output/             # Generated files (gitignored)
-│   │       ├── heygen/
-│   │       ├── veo3/
-│   │       ├── audio/
-│   │       ├── remotion/
-│   │       └── final/
-│   │
-│   └── lesson-002-functions/
-│       └── ...
-│
-└── shared/
-    └── assets/
-        └── jiki-character.png  # Character reference image
-```
-
----
-
-## Workflows
-
-### Creating a New Video
-
-1. Create lesson directory: `lessons/lesson-XXX/`
-2. Create `pipeline.json` with nodes
-3. Create referenced assets (scripts, prompts, configs)
-4. Open in visual editor: `http://localhost:3000/pipeline/lesson-XXX`
-5. Edit nodes, adjust connections
-6. Run pipeline: Click "▶️ Run" or `pnpm exec:pipeline lesson-XXX`
-7. Monitor progress in visual editor (status updates in real-time)
-8. Find final video in `lessons/lesson-XXX/output/final/`
-
-### Editing a Pipeline
-
-1. Open in visual editor
-2. Click node to edit in right panel
-3. Modify config, inputs, etc.
-4. Save (writes back to `pipeline.json`)
-5. Re-run node or entire pipeline
-
-### Running from CLI
-
-```bash
-# Execute entire pipeline
-pnpm exec:pipeline lesson-001-variables
-
-# Execute single node
-pnpm exec:node lesson-001-variables heygen_intro
-
-# Validate pipeline JSON
-pnpm validate lesson-001-variables
-
-# Show pipeline status
-pnpm status lesson-001-variables
-```
-
-### Code Screen Generation (Remotion)
-
-The existing Remotion functionality is preserved and integrated as the `render-code` node type:
-
-```json
-{
-  "code_screen": {
-    "type": "render-code",
-    "inputs": {
-      "config": "code_config"
-    },
-    "config": {
-      "provider": "remotion",
-      "compositionId": "code-scene"
-    }
-  }
-}
-```
-
-The `render-code` executor (`pipeline/lib/executors/render-code.ts`) calls the Remotion renderer (`pipeline/lib/providers/remotion.ts`), which uses the existing `remotion/` codebase.
-
-**Standalone usage still works:**
-
-```bash
-# Preview code scenes in Remotion Studio
-cd remotion && pnpm dev
-
-# Render individual code scenes
-cd remotion && pnpm render example-basic
-```
-
----
-
-## Implementation Phases
-
-### Phase 1: JSON Schema + Types (Week 1)
-
-- [ ] Define complete TypeScript types for pipeline JSON
-- [ ] Implement JSON validation with zod
-- [ ] Create example pipeline JSON files
-- [ ] Document all node types and their config schemas
-
-### Phase 2: Visual Editor Foundation (Week 1-2)
-
-- [ ] Set up Next.js app with App Router
-- [ ] Integrate React Flow
-- [ ] Implement JSON → React Flow conversion
-- [ ] Auto-layout with dagre (left-to-right)
-- [ ] Basic node rendering (boxes with labels)
-- [ ] Load/display existing pipeline JSON
-
-### Phase 3: Visual Editor - Nodes & Editing (Week 2)
-
-- [ ] Custom node components for each type
-- [ ] Status-based styling (colors, animations)
-- [ ] Node icons and info display
-- [ ] Editor panel with dynamic forms
-- [ ] Save changes back to JSON
-- [ ] Add/delete nodes
-- [ ] Validate dependencies (prevent cycles)
-
-### Phase 4: Execution Engine (Week 2-3)
+#### Phase 5: Execution Engine
 
 - [ ] Dependency graph resolver
-- [ ] State management (read/write JSON with locking)
 - [ ] Base executor framework
-- [ ] Implement node executors:
-  - [ ] `asset` (file reference)
-  - [ ] `render-code` (wrap existing Remotion)
-  - [ ] `merge-videos` (FFmpeg concat)
-  - [ ] `compose-video` (FFmpeg overlay)
-- [ ] CLI scripts (run-pipeline, run-node, status)
+- [ ] Node executors (asset, render-code, merge-videos)
+- [ ] CLI scripts (run-pipeline, run-node)
+- [ ] Status update functions (write to DB)
 
-### Phase 5: Provider Integrations (Week 3-4)
+#### Phase 6: Provider Integrations
 
-- [ ] FFmpeg wrapper (`mix-audio`, `merge-videos`, `compose-video`)
-- [ ] Remotion wrapper (calls existing renderer)
-- [ ] HeyGen API wrapper (`talking-head`)
-- [ ] Veo 3 API wrapper (`generate-animation`)
-- [ ] ElevenLabs API wrapper (`generate-voiceover`)
-- [ ] S3/R2 storage integration
-
-### Phase 6: Editor ↔ Engine Integration (Week 4)
-
-- [ ] API routes for executing pipelines/nodes
-- [ ] File watching for real-time status updates
-- [ ] Progress indicators in visual editor
-- [ ] Error display and retry logic
-- [ ] Webhook support for async providers
-
-### Phase 7: Production Readiness (Week 5+)
-
-- [ ] Create first complete lesson end-to-end
-- [ ] Cost tracking and reporting
-- [ ] Cleanup scripts (remove intermediate files)
-- [ ] Error recovery and resume
-- [ ] Documentation and examples
-- [ ] Deploy editor to web (Vercel/Cloud)
-
----
-
-## Cost Estimates (Per Lesson)
-
-| Service        | Usage                      | Cost        |
-| -------------- | -------------------------- | ----------- |
-| **HeyGen**     | 2 min talking head         | $10.00      |
-| **Veo 3**      | 3 min animations (180 sec) | $72.00      |
-| **ElevenLabs** | 3 min voiceover            | $9.00       |
-| **Remotion**   | 4 min code screens (local) | $0.00       |
-| **S3 Storage** | ~5GB                       | $0.12/month |
-| **Total**      | One-time generation        | **~$91.00** |
-
-For 50 lessons: **~$4,550** (one-time) + **~$6/month** (storage)
+- [ ] FFmpeg wrapper
+- [ ] Remotion wrapper
+- [ ] HeyGen API
+- [ ] Veo 3 API
+- [ ] ElevenLabs API
 
 ---
 
 ## Technical Decisions
 
-### Why Function-First Node Types?
+### Why PostgreSQL?
 
-Node types describe **what** they do (`merge-videos`), not **how** (`ffmpeg`). The implementation provider is in `config.provider`. This allows:
+**JSONB Support**: Native JSON columns allow partial updates (`jsonb_set()`), querying nested fields, and indexing on JSON paths without deserializing.
 
-- Swapping providers without changing node type
-- Multiple implementations of same function
-- Easier visual representation
-- More maintainable code
+**Concurrency**: MVCC (Multi-Version Concurrency Control) handles simultaneous UI + Executor writes without conflicts. Connection pooling for parallel Next.js Server Actions.
 
-### Why Single JSON File?
+**Performance**: Fast indexed queries on JSONB fields. GIN indexes on JSON paths for complex queries. Single transaction for multi-node updates.
 
-- **Version control**: Track pipeline evolution in Git
-- **Portability**: One file = one video (easy to share/duplicate)
-- **Transparency**: See entire state at a glance
-- **Simplicity**: No database, no separate state management
+**Scalability**: Handles thousands of concurrent connections. Suitable for production deployment with managed services (Supabase, Neon, Railway).
 
-### Why Next.js Over Vite?
+### Why Separate Structure and State?
 
-- Consistency with existing Next.js usage
-- Server-side file operations (reading/writing pipeline JSON)
-- API routes for execution triggers
-- Future-proofing for web features (auth, collaboration, webhooks)
-- Production deployment path (Vercel)
+UI edits pipeline **structure** (nodes, edges, config).
+Executor edits **execution state** (status, metadata, output).
+
+By separating at the column level, they never conflict. UI updates preserve execution state from DB. Executor updates never touch structure.
 
 ### Why React Flow?
 
-- Purpose-built for visual graphs with dependencies
-- Auto-layout algorithms (dagre/elk)
+Purpose-built for visual graphs with:
+
+- Auto-layout algorithms (dagre)
 - Custom node rendering
 - Built-in zoom/pan/minimap
-- Active development and community
+- Edge routing
+- Node dragging
+- Interactive editing
 
----
+### Why Server Actions (Not API Routes)?
 
-## Future Enhancements
+**Direct Database Access**: Server Actions run in Node.js context, allowing async PostgreSQL calls without Edge Runtime restrictions.
 
-### Near-term
+**Simplified Architecture**: No API layer needed. Functions colocated with pages that use them in `actions.ts` files.
 
-- Templates for common pipeline patterns
-- Node library/marketplace
-- Batch operations (run multiple lessons)
-- Timeline view (alternative to graph)
-- Export/import pipeline snippets
+**Type Safety**: Server Actions share types with client components. Parameters and return values are automatically serialized.
 
-### Long-term
+**Better DX**: Client code looks like local function calls. No fetch boilerplate, no manual error handling, no URL construction.
 
-- Multi-language support (one pipeline → multiple languages)
-- Collaborative editing (multiple users)
-- Cloud execution (run pipelines on remote servers)
-- AI-assisted pipeline generation
-- Version control integration (diff pipelines)
-- Cost optimization suggestions
-- A/B testing support (generate variants)
+**Automatic Revalidation**: `revalidatePath()` triggers Server Component refresh automatically. No manual cache invalidation.
+
+**Progressive Enhancement**: Forms can work without JavaScript (though React Flow requires JS).
+
+### Why Atomic Operations (Not Converters)?
+
+**Granular Updates**: Each UI action updates only what changed. No need to serialize/deserialize entire graph.
+
+**Clear Intent**: `connectNodes()` is self-documenting. A generic converter obscures the actual operation.
+
+**Preserves State**: Partial updates automatically preserve execution state. Converters risk overwriting status/metadata.
+
+**Type Safety**: Each function has specific parameters. Converters require complex union types for all possible changes.
+
+**Debuggability**: Stack traces point to exact operations. Converters hide the actual modification in generic logic.
+
+### Why Manual Save (Not Auto-save)?
+
+Gives users control over when changes are persisted. Clear "unsaved changes" indicator. Can experiment without committing. Fits deliberate pipeline editing workflow better than rapid typing.
 
 ---
 
@@ -614,7 +856,7 @@ Node types describe **what** they do (`merge-videos`), not **how** (`ffmpeg`). T
 
 - Node.js 18+
 - pnpm
-- FFmpeg (for video operations)
+- PostgreSQL 14+ (local or hosted)
 
 ### Setup
 
@@ -622,28 +864,148 @@ Node types describe **what** they do (`merge-videos`), not **how** (`ffmpeg`). T
 # Install dependencies
 pnpm install
 
-# Start visual editor
-cd editor && pnpm dev
-# Opens http://localhost:3000
+# Create .env file with DATABASE_URL
+echo "DATABASE_URL=postgresql://localhost:5432/jiki_video_pipelines" > .env
 
-# Preview Remotion code screens (optional)
-cd remotion && pnpm dev
-# Opens http://localhost:3001
+# Create database (if not exists)
+createdb jiki_video_pipelines
+
+# Initialize database schema
+pnpm db:init
+
+# Seed with example data
+pnpm db:seed
+
+# Start dev server (port 3065)
+pnpm dev
 ```
 
-### Quick Test
+### Development
 
 ```bash
-# Validate example pipeline
-pnpm validate lesson-001-variables
+# Visual editor
+http://localhost:3065
 
-# Execute example pipeline
-pnpm exec:pipeline lesson-001-variables
+# List pipelines
+http://localhost:3065/
 
-# Monitor progress
-pnpm status lesson-001-variables
+# Edit pipeline
+http://localhost:3065/pipelines/example-pipeline
+```
+
+### Database Seeding
+
+The seed script (`pnpm db:seed`) loads JSON lesson configurations into the database for development and testing purposes.
+
+**Purpose:**
+
+- Quickly populate database with example pipelines
+- Test with realistic lesson data
+- Reset database to known state during development
+- Prototype new node types and configurations
+
+**Seed Data Location:**
+
+```
+lessons/
+├── lesson-001/
+│   └── pipeline.json         # Pipeline definition with nodes
+├── lesson-002/
+│   └── pipeline.json
+└── ...
+```
+
+**JSON Format:**
+
+```json
+{
+  "id": "lesson-001",
+  "title": "Introduction to Variables",
+  "version": "1.0",
+  "config": {
+    "storage": {
+      "bucket": "jiki-videos",
+      "prefix": "lessons/lesson-001/"
+    },
+    "workingDirectory": "./lessons/lesson-001/output"
+  },
+  "nodes": [
+    {
+      "id": "intro_script",
+      "type": "asset",
+      "asset": {
+        "source": "./lessons/lesson-001/scripts/intro.md",
+        "type": "text"
+      },
+      "config": {}
+    },
+    {
+      "id": "intro_video",
+      "type": "talking-head",
+      "inputs": {
+        "script": "intro_script"
+      },
+      "config": {
+        "provider": "heygen",
+        "avatarId": "instructor-1"
+      }
+    },
+    {
+      "id": "code_config",
+      "type": "asset",
+      "asset": {
+        "source": "./lessons/lesson-001/code/variables.json",
+        "type": "json"
+      },
+      "config": {}
+    },
+    {
+      "id": "code_screen",
+      "type": "render-code",
+      "inputs": {
+        "config": "code_config"
+      },
+      "config": {
+        "provider": "remotion",
+        "compositionId": "code-scene"
+      }
+    },
+    {
+      "id": "final_video",
+      "type": "merge-videos",
+      "inputs": {
+        "segments": ["intro_video", "code_screen"]
+      },
+      "config": {
+        "provider": "ffmpeg",
+        "transitions": "fade"
+      }
+    }
+  ]
+}
+```
+
+**Script Behavior:**
+
+1. Scans `lessons/` directory for `pipeline.json` files
+2. Validates JSON schema
+3. Inserts/updates pipelines in database
+4. Creates all nodes with `pending` status
+5. Reports success/failures
+
+**Usage:**
+
+```bash
+# Seed all lessons
+pnpm db:seed
+
+# Seed specific lesson
+pnpm db:seed -- lesson-001
+
+# Clear and reseed (development reset)
+pnpm db:reset
 ```
 
 ---
 
-This pipeline system provides a production-ready framework for generating educational videos at scale, with full transparency, visual control, and maintainable architecture.
+This pipeline system provides a production-ready framework for generating educational videos at scale, with concurrent access, real-time updates, and visual control.

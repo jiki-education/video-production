@@ -88,5 +88,13 @@ export default [
     rules: {
       "no-console": "off"
     }
+  },
+
+  // Library files - allow console
+  {
+    files: ["src/lib/**/*.{ts,js}"],
+    rules: {
+      "no-console": "off"
+    }
   }
 ];

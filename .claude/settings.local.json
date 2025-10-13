@@ -21,7 +21,14 @@
       "WebFetch(domain:www.remotion.dev)",
       "Bash(git log:*)",
       "Bash(pnpm remove:*)",
-      "WebFetch(domain:localhost)"
+      "WebFetch(domain:localhost)",
+      "Bash(pnpm approve-builds:*)",
+      "Bash(node-gyp:*)",
+      "Bash(npm run build-release:*)",
+      "Bash(pnpm db:init:*)",
+      "Bash(pnpm exec:*)",
+      "Bash(pnpm db:seed:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []
