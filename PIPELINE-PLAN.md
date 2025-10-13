@@ -680,7 +680,24 @@ code-videos/
 │   ├── db.ts                   # PostgreSQL connection pool
 │   ├── db-migrations.ts        # Schema creation
 │   ├── db-operations.ts        # Atomic DB operations (createNode, connectNodes, etc.)
-│   └── db-to-flow.ts          # DB → React Flow conversion (read-only)
+│   ├── types.ts                # Database type definitions
+│   └── nodes/
+│       ├── types.ts            # Type-safe node discriminated unions
+│       └── factory.ts          # DB ↔ Node conversion functions
+│
+├── test/                       # Test infrastructure
+│   ├── setup.ts                # Global test setup with transaction support
+│   ├── helpers/
+│   │   └── db.ts               # Test database helpers
+│   ├── factories/              # FactoryBot-style database factories
+│   │   ├── pipelines.ts        # Pipeline factories
+│   │   └── nodes.ts            # Node factories (all 8 types)
+│   ├── mocks/                  # In-memory mock factories
+│   │   ├── pipelines.ts        # Mock pipelines
+│   │   └── nodes.ts            # Mock nodes
+│   └── lib/
+│       └── nodes/
+│           └── factory.test.ts # Node factory tests
 │
 ├── pipeline/                   # Execution engine (future)
 │   ├── types/
@@ -738,22 +755,26 @@ code-videos/
 
 ### 🚧 In Progress
 
-#### Phase 2: PostgreSQL Integration
+#### Phase 2: PostgreSQL Integration & Type System
 
 - [x] Install `pg` and `@types/pg`
 - [x] Create database schema and migrations
 - [x] Set up DB connection pool
 - [x] Create atomic DB operation functions (createNode, deleteNode, connectNodes)
 - [x] Seed script to load JSON lessons into database (for development/testing)
+- [x] Create type-safe node discriminated unions (AssetNode, TalkingHeadNode, etc.)
+- [x] Implement DB ↔ Node conversion functions (nodeFromDB, nodeToDB)
+- [x] Set up comprehensive test infrastructure with Vitest + pg-transactional-tests
+- [x] Create FactoryBot-style database factories for testing
+- [x] Create in-memory mock factories for unit tests
 - [ ] Add remaining operations (updateNodeConfig, duplicateNode, etc.)
 
 #### Phase 3: React Flow Visualization
 
 - [ ] Install `reactflow` and `dagre`
-- [ ] Create DB → React Flow converter (read-only helper)
 - [ ] Create Server Actions wrapping atomic DB operations
 - [ ] Update PipelineEditor with React Flow (Client Component)
-- [ ] Create custom node components
+- [ ] Create custom node components for each node type
 - [ ] Implement auto-layout with dagre
 - [ ] Add node selection handler
 - [ ] Update EditorPanel with selected node form
@@ -843,6 +864,20 @@ Purpose-built for visual graphs with:
 **Type Safety**: Each function has specific parameters. Converters require complex union types for all possible changes.
 
 **Debuggability**: Stack traces point to exact operations. Converters hide the actual modification in generic logic.
+
+### Why Discriminated Union Types (Not Loaders/Parsers)?
+
+**Type Safety**: TypeScript can narrow types based on the `type` field, providing compile-time safety for node-specific operations.
+
+**No Runtime Overhead**: Type discrimination happens at compile time. No classes, no instanceof checks, just plain objects.
+
+**Serialization-Friendly**: Plain objects serialize/deserialize trivially to/from JSON and database JSONB columns.
+
+**Immutable Updates**: Spread operators work naturally with plain objects, making React state updates simple and predictable.
+
+**Factory Pattern**: Conversion functions (nodeFromDB/nodeToDB) handle the mapping between database snake_case and domain camelCase, keeping business logic separate from persistence.
+
+**Testing**: Mock factories create in-memory objects instantly. Database factories create actual DB records with sensible defaults (FactoryBot pattern).
 
 ### Why Manual Save (Not Auto-save)?
 
