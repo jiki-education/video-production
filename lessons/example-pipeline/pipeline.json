@@ -1,0 +1,65 @@
+{
+  "version": "1.0",
+  "id": "example-pipeline",
+  "title": "Example Pipeline",
+  "created": "2025-10-13T10:00:00Z",
+  "updated": "2025-10-13T14:30:00Z",
+  "config": {
+    "storage": {
+      "bucket": "jiki-videos",
+      "prefix": "lessons/example-pipeline/"
+    },
+    "workingDirectory": "./output"
+  },
+  "nodes": {
+    "intro_script": {
+      "type": "asset",
+      "status": "completed",
+      "asset": {
+        "source": "./scripts/intro.md",
+        "type": "text"
+      },
+      "output": {
+        "type": "text",
+        "file": "./scripts/intro.md"
+      }
+    },
+    "code_config": {
+      "type": "asset",
+      "status": "completed",
+      "asset": {
+        "source": "./code/segment-1.json",
+        "type": "json"
+      },
+      "output": {
+        "type": "json",
+        "file": "./code/segment-1.json"
+      }
+    },
+    "code_screen": {
+      "type": "render-code",
+      "status": "pending",
+      "inputs": {
+        "config": "code_config"
+      },
+      "config": {
+        "provider": "remotion",
+        "compositionId": "code-scene"
+      },
+      "output": {
+        "type": "video"
+      }
+    }
+  },
+  "metadata": {
+    "totalCost": 0,
+    "estimatedTotalCost": 0,
+    "progress": {
+      "completed": 2,
+      "in_progress": 0,
+      "pending": 1,
+      "failed": 0,
+      "total": 3
+    }
+  }
+}
