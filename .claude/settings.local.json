@@ -28,7 +28,12 @@
       "Bash(pnpm db:init:*)",
       "Bash(pnpm exec:*)",
       "Bash(pnpm db:seed:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(pnpm test:setup:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm test:run)",
+      "Bash(pnpm lint)"
     ],
     "deny": [],
     "ask": []

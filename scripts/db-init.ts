@@ -9,7 +9,7 @@
  */
 
 import "dotenv/config";
-import { closePool, initializeSchema } from "../src/lib/db";
+import { closePool, initializeSchema } from "../lib/db";
 
 async function main() {
   console.log("Initializing PostgreSQL database...\n");

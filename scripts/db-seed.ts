@@ -12,7 +12,7 @@
 import "dotenv/config";
 import { readdir, readFile } from "fs/promises";
 import { join } from "path";
-import { getPool, closePool } from "../src/lib/db";
+import { getPool, closePool } from "../lib/db";
 
 interface PipelineJSON {
   id: string;

@@ -66,7 +66,24 @@ code-videos/
 │   ├── db.ts                  # PostgreSQL connection pool
 │   ├── db-operations.ts       # Atomic DB operations (JSONB partial updates)
 │   ├── db-migrations.ts       # Schema creation
-│   └── db-to-flow.ts          # DB → React Flow converter
+│   ├── types.ts               # Database type definitions
+│   └── nodes/
+│       ├── types.ts           # Type-safe node discriminated unions
+│       └── factory.ts         # DB ↔ Node conversion functions
+│
+├── test/                      # Test infrastructure
+│   ├── setup.ts               # Global test setup with transaction support
+│   ├── helpers/
+│   │   └── db.ts              # Test database helpers
+│   ├── factories/             # FactoryBot-style database factories
+│   │   ├── pipelines.ts       # Pipeline factories
+│   │   └── nodes.ts           # Node factories (all 8 types)
+│   ├── mocks/                 # In-memory mock factories
+│   │   ├── pipelines.ts       # Mock pipelines
+│   │   └── nodes.ts           # Mock nodes
+│   └── lib/
+│       └── nodes/
+│           └── factory.test.ts # Node factory tests
 │
 ├── pipeline/                  # Execution engine (future)
 │   ├── scripts/               # CLI executors
@@ -78,7 +95,7 @@ code-videos/
 │   ├── compositions/
 │   │   └── CodeScene.tsx      # Main scene composition
 │   ├── lib/
-│   │   ├── types.ts           # TypeScript types
+│   │   ├── types.ts           # Remotion scene types
 │   │   ├── timing.ts          # Frame calculations
 │   │   └── audio.tsx          # Keypress sound management
 │   └── assets/sounds/
@@ -87,7 +104,8 @@ code-videos/
 ├── scripts/                   # Rendering and DB scripts
 │   ├── render.ts              # Render code screens
 │   ├── db-init.ts             # Initialize database
-│   └── db-seed.ts             # Seed pipelines from JSON
+│   ├── db-seed.ts             # Seed pipelines from JSON
+│   └── setup-test-db.sh       # Test database setup script
 │
 └── lessons/                   # Lesson assets and pipeline configs
     └── lesson-001/
@@ -346,6 +364,130 @@ pnpm render:all
 - **Separation**: Content creators don't need code knowledge
 - **Version Control**: Easy to track changes
 - **Automation**: Can be generated from scripts/databases
+
+## Testing
+
+### Test Framework
+
+- **Vitest** - Fast, modern test runner with TypeScript support
+- **pg-transactional-tests** - Automatic transaction rollback (Rails-style testing)
+- Test files located in `test/` directory
+
+### Writing Tests
+
+All database tests automatically run in isolated transactions that rollback after completion:
+
+```typescript
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { testTransaction, query, createTestPipeline } from "@/test/helpers/db";
+
+// Wrap each test in a transaction
+beforeEach(testTransaction.start);
+afterEach(testTransaction.rollback);
+
+describe("My Feature", () => {
+  it("creates a node", async () => {
+    // Create test pipeline (required for foreign keys)
+    await createTestPipeline();
+
+    // Insert test data
+    await query("INSERT INTO nodes (id, pipeline_id, type, inputs, config, status) VALUES ($1, $2, $3, $4, $5, $6)", [
+      "test-node",
+      "test-pipeline",
+      "asset",
+      {},
+      {},
+      "pending"
+    ]);
+
+    // Run assertions
+    const [node] = await query("SELECT * FROM nodes WHERE id = $1", ["test-node"]);
+    expect(node.status).toBe("pending");
+
+    // Automatic rollback - no cleanup needed!
+  });
+});
+```
+
+### Database Factories (FactoryBot Pattern)
+
+Use database factories from `@/test/factories` for creating actual DB records with sensible defaults:
+
+```typescript
+import { createPipeline, createTalkingHeadNode } from "@/test/factories";
+
+// Auto-creates pipeline if not provided
+const node = await createTalkingHeadNode({
+  id: "my-test-node",
+  config: { provider: "heygen", avatarId: "avatar-1" }
+});
+
+// Or create pipeline explicitly
+const pipeline = await createPipeline({ id: "my-pipeline" });
+const node2 = await createTalkingHeadNode({
+  pipelineId: pipeline.id,
+  config: { provider: "heygen" }
+});
+```
+
+Available factories:
+
+- `createPipeline()` / `buildPipeline()` - Pipeline records
+- `createAssetNode()` - Asset nodes
+- `createTalkingHeadNode()` - Talking head nodes
+- `createRenderCodeNode()` - Render code nodes
+- `createGenerateAnimationNode()` - Animation nodes
+- `createGenerateVoiceoverNode()` - Voiceover nodes
+- `createMixAudioNode()` - Mix audio nodes
+- `createMergeVideosNode()` - Merge videos nodes
+- `createComposeVideoNode()` - Compose video nodes
+
+### Mock Factories (In-Memory)
+
+Use mock factories from `@/test/mocks` for testing serialization without database:
+
+```typescript
+import { createMockTalkingHeadNode, createMockPipeline } from "@/test/mocks";
+
+const node = createMockTalkingHeadNode({
+  id: "my-test-node",
+  config: { provider: "heygen", avatarId: "avatar-1" }
+});
+```
+
+### Running Tests
+
+```bash
+# Set up test database (first time only)
+pnpm test:setup
+
+# Run tests in watch mode
+pnpm test
+
+# Run once and exit
+pnpm test:run
+
+# Run with UI
+pnpm test:ui
+
+# Run with coverage
+pnpm test:coverage
+```
+
+### Test Database
+
+- **Separate database**: `jiki_video_pipelines_test`
+- **Automatic schema creation** via `test/setup.ts`
+- **Transaction isolation**: Each test runs in its own transaction
+- **Parallel execution**: Tests run in parallel via Vitest's fork pool
+
+### Key Testing Principles
+
+1. **Use database factories from `@/test/factories`** for creating DB records - they auto-create dependencies
+2. **Use mock factories from `@/test/mocks`** for in-memory testing without DB
+3. **Never manually rollback** - `testTransaction` handles it automatically
+4. **Tests are fast** - Transaction rollback is instant (~0.1ms)
+5. **No test pollution** - Each test starts with a clean database state
 
 ## Future Enhancements
 

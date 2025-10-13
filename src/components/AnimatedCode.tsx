@@ -29,7 +29,7 @@ export const AnimatedCode: React.FC<AnimatedCodeProps> = ({ action, startFrame, 
   let calculatedFrames = 0;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const speed = (speeds[i] as TypingSpeed) || "normal";
+    const speed = (speeds[i] as TypingSpeed | undefined) ?? "normal";
     const charsPerSec = getCharsPerSecond(speed);
     const framesPerChar = fps / charsPerSec;
 
@@ -49,7 +49,7 @@ export const AnimatedCode: React.FC<AnimatedCodeProps> = ({ action, startFrame, 
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const speed = (speeds[i] as TypingSpeed) || "normal";
+    const speed = (speeds[i] as TypingSpeed | undefined) ?? "normal";
     const charsPerSec = getCharsPerSecond(speed);
     const framesPerChar = fps / charsPerSec;
 

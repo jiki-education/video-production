@@ -12,6 +12,11 @@
     "render:all": "tsx scripts/renderAll.ts",
     "db:init": "tsx scripts/db-init.ts",
     "db:seed": "tsx scripts/db-seed.ts",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:setup": "./scripts/setup-test-db.sh",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
     "format": "prettier --write .",
@@ -45,10 +50,13 @@
     "@types/react-syntax-highlighter": "^15.5.13",
     "@typescript-eslint/eslint-plugin": "^8.46.0",
     "@typescript-eslint/parser": "^8.46.0",
+    "@vitest/ui": "^3.2.4",
     "eslint": "^9.37.0",
     "husky": "^9.1.7",
+    "pg-transactional-tests": "^1.2.0",
     "prettier": "^3.6.2",
     "tsx": "^4.20.6",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   }
 }

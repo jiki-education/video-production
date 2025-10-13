@@ -92,7 +92,15 @@ export default [
 
   // Library files - allow console
   {
-    files: ["src/lib/**/*.{ts,js}"],
+    files: ["src/lib/**/*.{ts,js}", "lib/**/*.{ts,js}"],
+    rules: {
+      "no-console": "off"
+    }
+  },
+
+  // Test files - allow console
+  {
+    files: ["test/**/*.{ts,js}"],
     rules: {
       "no-console": "off"
     }

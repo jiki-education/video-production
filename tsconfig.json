@@ -17,7 +17,9 @@
     "isolatedModules": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./*"],
+      "@/lib/*": ["lib/*"],
+      "@/test/*": ["test/*"]
     },
     "plugins": [
       {
@@ -27,10 +29,13 @@
   },
   "include": [
     "src/**/*",
+    "lib/**/*",
+    "test/**/*",
     "scripts/**/*",
     "remotion.config.ts",
     "next.config.ts",
     "next-env.d.ts",
+    "vitest.config.ts",
     "app/**/*.ts",
     "app/**/*.tsx",
     ".next/types/**/*.ts"

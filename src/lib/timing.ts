@@ -17,8 +17,8 @@ export function calculateActionDuration(action: Action, fps: number): number {
       // Different speed per line
       let totalTime = 0;
       lines.forEach((line, index) => {
-        const speed = action.speed[index] || "normal";
-        const charsPerSec = getCharsPerSecond(speed as TypingSpeed);
+        const speed = (action.speed[index] as TypingSpeed | undefined) ?? "normal";
+        const charsPerSec = getCharsPerSecond(speed);
         totalTime += line.length / charsPerSec;
       });
       return totalTime * fps;
