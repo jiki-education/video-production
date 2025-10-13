@@ -19,9 +19,12 @@
       "WebSearch",
       "Bash(pnpm list:*)",
       "WebFetch(domain:www.remotion.dev)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(pnpm remove:*)",
+      "WebFetch(domain:localhost)"
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "outputStyle": "Explanatory"
 }
