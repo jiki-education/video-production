@@ -32,6 +32,7 @@ export async function createSchema(pool: Pool): Promise<void> {
       CREATE TABLE IF NOT EXISTS nodes (
         id TEXT NOT NULL,
         pipeline_id TEXT NOT NULL,
+        title TEXT NOT NULL,       -- Display title for the node
 
         -- Structure (editable by UI)
         type TEXT NOT NULL,        -- 'asset', 'render-code', 'talking-head', etc.

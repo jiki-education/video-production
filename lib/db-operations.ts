@@ -154,9 +154,10 @@ export async function deleteNode(pipelineId: string, nodeId: string): Promise<vo
 }
 
 /**
- * Connects two nodes by setting an input reference
+ * Connects two nodes by appending to the target node's input array
  *
- * Sets targetNode.inputs[inputKey] = sourceNodeId
+ * Appends sourceNodeId to targetNode.inputs[inputKey] array
+ * Prevents duplicate connections to the same input
  *
  * @param pipelineId - The pipeline ID
  * @param sourceNodeId - The source node (providing output)
@@ -165,7 +166,7 @@ export async function deleteNode(pipelineId: string, nodeId: string): Promise<vo
  *
  * Example:
  *   await connectNodes('lesson-001', 'code_config', 'code_screen', 'config')
- *   // Sets code_screen.inputs.config = 'code_config'
+ *   // Appends 'code_config' to code_screen.inputs.config array
  */
 export async function connectNodes(
   pipelineId: string,
@@ -194,17 +195,33 @@ export async function connectNodes(
     throw new Error(`Target node not found: ${pipelineId}/${targetNodeId}`);
   }
 
-  // Update target node's inputs using jsonb_set
-  // jsonb_set(target, path, new_value, create_missing)
+  // Check if already connected (prevent duplicates)
+  const targetNode = targetResult.rows[0];
+  const existingInput = targetNode.inputs[inputKey];
+
+  if (Array.isArray(existingInput) && existingInput.includes(sourceNodeId)) {
+    // Already connected, no-op
+    return;
+  }
+
+  // Append to array using jsonb_set with path '{inputKey,-1}'
+  // -1 means append to end of array
+  // COALESCE ensures we start with empty array if input doesn't exist yet
   await pool.query(
     `
     UPDATE nodes
-    SET inputs = jsonb_set(inputs, $1, $2, true)
-    WHERE pipeline_id = $3 AND id = $4
+    SET inputs = jsonb_set(
+      inputs,
+      $1,
+      COALESCE(inputs->$2, '[]'::jsonb) || to_jsonb($3::text),
+      true
+    )
+    WHERE pipeline_id = $4 AND id = $5
   `,
     [
       `{${inputKey}}`, // JSONB path
-      JSON.stringify(sourceNodeId), // New value (must be JSON string)
+      inputKey, // Key to get existing array
+      sourceNodeId, // Value to append
       pipelineId,
       targetNodeId
     ]

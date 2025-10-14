@@ -33,10 +33,17 @@
       "Bash(pnpm test:setup:*)",
       "Bash(pnpm test:*)",
       "Bash(pnpm test:run)",
-      "Bash(pnpm lint)"
+      "Bash(pnpm lint)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)",
+      "Bash(pnpm typecheck)",
+      "Bash(psql:*)",
+      "Bash(pnpm db:migrate-inputs:*)",
+      "WebFetch(domain:reactflow.dev)",
+      "Bash(pnpm prettier:*)"
     ],
     "deny": [],
     "ask": []
   },
-  "outputStyle": "Explanatory"
+  "outputStyle": "default"
 }

@@ -34,6 +34,7 @@ export function nodeFromDB(row: DBNode): Node {
   return {
     id: row.id,
     pipelineId: row.pipeline_id,
+    title: row.title,
     type: row.type,
     inputs: row.inputs,
     config: row.config,
@@ -73,6 +74,7 @@ export function nodeToDB(node: Node): DBNode {
   return {
     id: node.id,
     pipeline_id: node.pipelineId,
+    title: node.title,
     type: node.type,
     inputs: node.inputs,
     config: node.config,
@@ -141,7 +143,7 @@ export function validateNode(node: Node): { valid: boolean; errors: string[] } {
       if (node.config.provider === undefined || node.config.provider === null || node.config.provider === "") {
         errors.push("Render code node missing provider");
       }
-      if (node.inputs.config === undefined || node.inputs.config === null || node.inputs.config === "") {
+      if (node.inputs.config === undefined || node.inputs.config === null || node.inputs.config.length === 0) {
         errors.push("Render code node missing config input");
       }
       break;
@@ -153,10 +155,10 @@ export function validateNode(node: Node): { valid: boolean; errors: string[] } {
       if (
         node.inputs.video === undefined ||
         node.inputs.video === null ||
-        node.inputs.video === "" ||
+        node.inputs.video.length === 0 ||
         node.inputs.audio === undefined ||
         node.inputs.audio === null ||
-        node.inputs.audio === ""
+        node.inputs.audio.length === 0
       ) {
         errors.push("Mix audio node missing video or audio input");
       }
@@ -178,10 +180,10 @@ export function validateNode(node: Node): { valid: boolean; errors: string[] } {
       if (
         node.inputs.background === undefined ||
         node.inputs.background === null ||
-        node.inputs.background === "" ||
+        node.inputs.background.length === 0 ||
         node.inputs.overlay === undefined ||
         node.inputs.overlay === null ||
-        node.inputs.overlay === ""
+        node.inputs.overlay.length === 0
       ) {
         errors.push("Compose video node missing background or overlay input");
       }

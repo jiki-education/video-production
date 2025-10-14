@@ -48,7 +48,7 @@ describe("nodeFromDB", () => {
     // Create test node using factory
     await createTalkingHeadNode({
       id: "test-talking-head",
-      inputs: { script: "test-script" },
+      inputs: { script: ["test-script"] },
       config: { provider: "heygen", avatarId: "avatar-1" }
     });
 
@@ -58,7 +58,7 @@ describe("nodeFromDB", () => {
 
     expect(node.type).toBe("talking-head");
     if (node.type === "talking-head") {
-      expect(node.inputs.script).toBe("test-script");
+      expect(node.inputs.script).toEqual(["test-script"]);
       expect(node.config.provider).toBe("heygen");
       expect(node.config.avatarId).toBe("avatar-1");
     }
@@ -68,7 +68,7 @@ describe("nodeFromDB", () => {
     // Create test node using factory
     await createRenderCodeNode({
       id: "test-render-code",
-      inputs: { config: "test-config" },
+      inputs: { config: ["test-config"] },
       config: { provider: "remotion", compositionId: "code-scene" }
     });
 
@@ -78,7 +78,7 @@ describe("nodeFromDB", () => {
 
     expect(node.type).toBe("render-code");
     if (node.type === "render-code") {
-      expect(node.inputs.config).toBe("test-config");
+      expect(node.inputs.config).toEqual(["test-config"]);
       expect(node.config.provider).toBe("remotion");
       expect(node.config.compositionId).toBe("code-scene");
     }

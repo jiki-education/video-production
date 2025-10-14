@@ -61,6 +61,7 @@ export type NodeType =
 export interface Node {
   id: string;
   pipeline_id: string;
+  title: string; // Display title for the node
 
   // Structure (editable by UI)
   type: NodeType;

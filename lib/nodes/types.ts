@@ -18,6 +18,7 @@ import type { NodeStatus, NodeMetadata, NodeOutput, AssetConfig } from "@/lib/ty
 interface BaseNode {
   id: string;
   pipelineId: string;
+  title: string; // Display title for the node
   status: NodeStatus;
   metadata: NodeMetadata | null;
   output: NodeOutput | null;
@@ -37,7 +38,7 @@ export interface AssetNode extends BaseNode {
 export interface TalkingHeadNode extends BaseNode {
   type: "talking-head";
   inputs: {
-    script?: string; // Reference to asset node with script
+    script?: string[]; // Reference to asset node with script
   };
   config: {
     provider: string; // e.g., "heygen", "elevenlabs"
@@ -50,8 +51,8 @@ export interface TalkingHeadNode extends BaseNode {
 export interface GenerateAnimationNode extends BaseNode {
   type: "generate-animation";
   inputs: {
-    prompt?: string; // Reference to asset node with prompt
-    referenceImage?: string; // Optional reference image
+    prompt?: string[]; // Reference to asset node with prompt
+    referenceImage?: string[]; // Optional reference image
   };
   config: {
     provider: string; // e.g., "veo3", "runway"
@@ -64,7 +65,7 @@ export interface GenerateAnimationNode extends BaseNode {
 export interface GenerateVoiceoverNode extends BaseNode {
   type: "generate-voiceover";
   inputs: {
-    script?: string; // Reference to asset node with script
+    script?: string[]; // Reference to asset node with script
   };
   config: {
     provider: string; // e.g., "elevenlabs", "heygen"
@@ -77,7 +78,7 @@ export interface GenerateVoiceoverNode extends BaseNode {
 export interface RenderCodeNode extends BaseNode {
   type: "render-code";
   inputs: {
-    config?: string; // Reference to asset node with Remotion config JSON
+    config?: string[]; // Reference to asset node with Remotion config JSON
   };
   config: {
     provider: string; // e.g., "remotion"
@@ -89,8 +90,8 @@ export interface RenderCodeNode extends BaseNode {
 export interface MixAudioNode extends BaseNode {
   type: "mix-audio";
   inputs: {
-    video?: string; // Reference to video node
-    audio?: string; // Reference to audio node
+    video?: string[]; // Reference to video node
+    audio?: string[]; // Reference to audio node
   };
   config: {
     provider: string; // e.g., "ffmpeg"
@@ -115,8 +116,8 @@ export interface MergeVideosNode extends BaseNode {
 export interface ComposeVideoNode extends BaseNode {
   type: "compose-video";
   inputs: {
-    background?: string; // Background video
-    overlay?: string; // Overlay video (e.g., talking head)
+    background?: string[]; // Background video
+    overlay?: string[]; // Overlay video (e.g., talking head)
   };
   config: {
     provider: string; // e.g., "ffmpeg"
@@ -151,6 +152,11 @@ export type Node =
   | MixAudioNode
   | MergeVideosNode
   | ComposeVideoNode;
+
+/**
+ * Extract the type field from all node types
+ */
+export type NodeType = Node["type"];
 
 // ============================================================================
 // Type Guards

@@ -724,18 +724,146 @@ code-videos/
 
 ---
 
-## Node Types
+## Node Types & Input System
 
-| Type                 | Description                  | Example Providers  |
-| -------------------- | ---------------------------- | ------------------ |
-| `asset`              | Static file reference        | local filesystem   |
-| `talking-head`       | Human presenter video        | heygen             |
-| `generate-animation` | Animated character scenes    | veo3, runway       |
-| `generate-voiceover` | Text-to-speech audio         | elevenlabs, heygen |
-| `render-code`        | Animated code screens        | remotion           |
-| `mix-audio`          | Replace/overlay audio tracks | ffmpeg             |
-| `merge-videos`       | Concatenate video segments   | ffmpeg             |
-| `compose-video`      | Picture-in-picture, overlays | ffmpeg             |
+### Node Types Overview
+
+| Type                 | Description                  | Example Providers  | Max Inputs              |
+| -------------------- | ---------------------------- | ------------------ | ----------------------- |
+| `asset`              | Static file reference        | local filesystem   | 0                       |
+| `talking-head`       | Human presenter video        | heygen             | 1 (script)              |
+| `generate-animation` | Animated character scenes    | veo3, runway       | 2 (prompt, ref image)   |
+| `generate-voiceover` | Text-to-speech audio         | elevenlabs, heygen | 1 (script)              |
+| `render-code`        | Animated code screens        | remotion           | 1 (config)              |
+| `mix-audio`          | Replace/overlay audio tracks | ffmpeg             | 2 (video, audio)        |
+| `merge-videos`       | Concatenate video segments   | ffmpeg             | -1 (unlimited segments) |
+| `compose-video`      | Picture-in-picture, overlays | ffmpeg             | 2 (background, overlay) |
+
+### Input System Architecture
+
+**All inputs are arrays** to support multiple connections where allowed:
+
+```typescript
+inputs: {
+  script?: string[];      // Array, but maxConnections=1
+  segments?: string[];    // Array, maxConnections=-1 (unlimited)
+}
+```
+
+### Input Configuration Metadata
+
+Each node type defines its input specifications:
+
+```typescript
+// lib/nodes/metadata.ts
+export interface InputConfig {
+  maxConnections: number; // -1 = unlimited, 0 = no inputs, 1+ = specific limit
+  ordered: boolean; // true = order matters (e.g., video segments)
+  label: string; // Display name for the input
+  required: boolean; // true = must have at least 1 connection
+}
+
+export const NODE_INPUT_CONFIG: Record<NodeType, Record<string, InputConfig>> = {
+  asset: {}, // No inputs
+
+  "talking-head": {
+    script: {
+      maxConnections: 1,
+      ordered: false,
+      label: "Script",
+      required: false
+    }
+  },
+
+  "render-code": {
+    config: {
+      maxConnections: 1,
+      ordered: false,
+      label: "Config",
+      required: true
+    }
+  },
+
+  "mix-audio": {
+    video: {
+      maxConnections: 1,
+      ordered: false,
+      label: "Video",
+      required: true
+    },
+    audio: {
+      maxConnections: 1,
+      ordered: false,
+      label: "Audio",
+      required: true
+    }
+  },
+
+  "merge-videos": {
+    segments: {
+      maxConnections: -1, // Unlimited
+      ordered: true, // Order determines sequence
+      label: "Video Segments",
+      required: true
+    }
+  }
+
+  // ... etc for all 8 node types
+};
+```
+
+### Visual Representation
+
+**Single-value inputs** (maxConnections=1):
+
+- Render one connection handle per input
+- Handle labeled with input name
+- React Flow prevents multiple connections
+
+**Array inputs** (maxConnections=-1):
+
+- Render one connection handle
+- Visual indicator (like "+" icon) shows unlimited connections
+- Order preserved in array
+- EditorPanel shows ordered list with drag-to-reorder (Phase 4)
+
+**Example node rendering:**
+
+```
+┌─────────────────┐
+│  mix-audio      │
+│                 │
+│ video  ●────    │  ← Single connection handle
+│ audio  ●────    │  ← Single connection handle
+│                 │
+│         ────● output
+└─────────────────┘
+
+┌─────────────────┐
+│  merge-videos   │
+│                 │
+│ segments+ ●───  │  ← Unlimited connections handle
+│                 │
+│         ────● output
+└─────────────────┘
+```
+
+### Connection Validation
+
+React Flow's `isValidConnection` callback checks:
+
+1. Does the input exist for this node type?
+2. Has the max connection limit been reached?
+3. Is the connection creating a cycle? (future enhancement)
+
+### Input Reordering (Phase 4)
+
+For `ordered: true` inputs like `merge-videos.segments`:
+
+- EditorPanel shows ordered list of connected nodes
+- Drag-and-drop to reorder
+- Server Action `reorderInputsAction()` updates database
+- For Phase 3: Order determined by connection order (simple)
 
 ---
 
@@ -751,9 +879,7 @@ code-videos/
 - [x] Component structure (Header, Footer, FlowCanvas, EditorPanel)
 - [x] Index page for listing pipelines
 - [x] Pipeline show page with JSON display
-- [x] Example pipeline JSON (will migrate to DB)
-
-### 🚧 In Progress
+- [x] Example pipeline JSON (migrated to DB)
 
 #### Phase 2: PostgreSQL Integration & Type System
 
@@ -767,27 +893,43 @@ code-videos/
 - [x] Set up comprehensive test infrastructure with Vitest + pg-transactional-tests
 - [x] Create FactoryBot-style database factories for testing
 - [x] Create in-memory mock factories for unit tests
-- [ ] Add remaining operations (updateNodeConfig, duplicateNode, etc.)
+- [x] Refactor connectNodes() for array-based input system
 
 #### Phase 3: React Flow Visualization
 
-- [ ] Install `reactflow` and `dagre`
-- [ ] Create Server Actions wrapping atomic DB operations
-- [ ] Update PipelineEditor with React Flow (Client Component)
-- [ ] Create custom node components for each node type
-- [ ] Implement auto-layout with dagre
-- [ ] Add node selection handler
-- [ ] Update EditorPanel with selected node form
-- [ ] Wire up React Flow callbacks to Server Actions (onConnect, onNodeDelete, etc.)
+- [x] Install `reactflow` and `dagre`
+- [x] Create Server Actions wrapping atomic DB operations
+- [x] Update PipelineEditor with React Flow (Client Component)
+- [x] Create custom node components for each node type (8 total: Asset, TalkingHead, RenderCode, GenerateAnimation, GenerateVoiceover, MixAudio, MergeVideos, ComposeVideo)
+- [x] Implement auto-layout with dagre
+- [x] Add node selection handler
+- [x] Update EditorPanel with selected node form
+- [x] Wire up React Flow callbacks to Server Actions (onConnect, onNodeDelete, etc.)
+
+#### Phase 3.5: Input System Refactoring
+
+- [x] Migrate all node inputs to array format (string → string[])
+- [x] Implement metadata-driven connection validation
+- [x] Add dynamic handle generation from metadata
+- [x] Prevent duplicate connections
+- [x] Visual indicators for unlimited vs limited inputs (darker green for unlimited)
+- [x] Create database migration script (pnpm db:migrate-inputs)
+- [x] Full TypeScript type safety with discriminated unions
+- [x] Update test factories and mocks for array inputs
 
 #### Phase 4: Interactive UI & State Management
 
-- [ ] Implement useTransition for optimistic updates
-- [ ] Add loading states during Server Action calls
-- [ ] Implement periodic status refresh with router.refresh()
-- [ ] Add manual refresh button for status updates
-- [ ] Handle Server Action errors with error boundaries
-- [ ] Add toast notifications for successful operations
+- [x] Implement optimistic updates for instant UI feedback
+- [x] Add loading states during Server Action calls (saving indicator)
+- [x] Add manual refresh button for status updates
+- [x] Handle Server Action errors with rollback to previous state
+
+### 🚧 In Progress
+
+#### Phase 4 (Remaining Items)
+
+- [ ] Implement periodic status refresh with router.refresh() (polling)
+- [ ] Add toast notifications for successful operations (currently using browser alerts)
 
 ### 📋 Planned
 

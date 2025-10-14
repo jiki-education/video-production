@@ -21,6 +21,7 @@ interface PipelineJSON {
   config: Record<string, unknown>;
   nodes: Array<{
     id: string;
+    title: string;
     type: string;
     inputs?: Record<string, string | string[]>;
     config?: Record<string, unknown>;
@@ -78,19 +79,23 @@ async function seedPipeline(pipelineData: PipelineJSON) {
 
       // Insert nodes
       for (const node of pipelineData.nodes) {
+        // Assets are immediately available, other nodes need execution
+        const status = node.type === "asset" ? "completed" : "pending";
+
         await client.query(
           `
-          INSERT INTO nodes (id, pipeline_id, type, inputs, config, asset, status, metadata, output)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          INSERT INTO nodes (id, pipeline_id, title, type, inputs, config, asset, status, metadata, output)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         `,
           [
             node.id,
             pipelineData.id,
+            node.title,
             node.type,
             node.inputs || {},
             node.config || {},
             node.asset || null,
-            "pending",
+            status,
             null,
             null
           ]
