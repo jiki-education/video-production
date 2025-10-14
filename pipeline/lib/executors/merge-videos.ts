@@ -23,15 +23,10 @@ import type { NodeOutput } from "@/lib/types";
  * @param nodeId - The node ID
  */
 export async function executeMergeVideos(pipelineId: string, nodeId: string): Promise<void> {
-  console.log(`\n${"=".repeat(60)}`);
-  console.log(`[Executor] Starting merge-videos: ${pipelineId}/${nodeId}`);
-  console.log(`${"=".repeat(60)}\n`);
-
   let tempOutputPath: string | null = null;
 
   try {
     // 1. Load node from database
-    console.log("[Step 1/7] Loading node from database...");
     const dbNode = await getNode(pipelineId, nodeId);
 
     if (!dbNode) {
@@ -42,17 +37,14 @@ export async function executeMergeVideos(pipelineId: string, nodeId: string): Pr
     const node = nodeFromDB(dbNode);
 
     // 2. Validate node type
-    console.log("[Step 2/7] Validating node type...");
     if (!isMergeVideosNode(node)) {
       throw new Error(`Node is not a merge-videos node: ${node.type}`);
     }
 
     // 3. Mark as started
-    console.log("[Step 3/7] Marking node as in_progress...");
     await setNodeStarted(pipelineId, nodeId);
 
     // 4. Get input nodes
-    console.log("[Step 4/7] Loading input segments...");
     const segmentIds = node.inputs.segments || [];
 
     if (segmentIds.length === 0) {
@@ -62,8 +54,6 @@ export async function executeMergeVideos(pipelineId: string, nodeId: string): Pr
     if (segmentIds.length === 1) {
       throw new Error("At least 2 segments required for merging");
     }
-
-    console.log(`  Found ${segmentIds.length} input segments: ${segmentIds.join(", ")}`);
 
     const dbInputNodes = await getNodes(pipelineId, segmentIds);
 
@@ -77,7 +67,6 @@ export async function executeMergeVideos(pipelineId: string, nodeId: string): Pr
     const inputNodes = nodesFromDB(dbInputNodes);
 
     // 5. Download input videos
-    console.log("[Step 5/7] Downloading input videos...");
     const localPaths: string[] = [];
 
     for (let i = 0; i < inputNodes.length; i++) {
@@ -87,16 +76,19 @@ export async function executeMergeVideos(pipelineId: string, nodeId: string): Pr
         throw new Error(`Input node has no output: ${inputNode.id}`);
       }
 
-      if (!inputNode.output.s3Key && !inputNode.output.localFile) {
+      if (
+        (inputNode.output.s3Key === null || inputNode.output.s3Key === undefined) &&
+        (inputNode.output.localFile === null || inputNode.output.localFile === undefined)
+      ) {
         throw new Error(`Input node has no S3 key or local file: ${inputNode.id}`);
       }
 
       // Construct S3 URL from key (or use localFile if available)
-      const url = inputNode.output.s3Key
-        ? `s3://${process.env.AWS_S3_BUCKET}/${inputNode.output.s3Key}`
-        : inputNode.output.localFile!;
+      const url =
+        inputNode.output.s3Key !== null && inputNode.output.s3Key !== undefined
+          ? `s3://${process.env.AWS_S3_BUCKET}/${inputNode.output.s3Key}`
+          : inputNode.output.localFile!;
 
-      console.log(`  [${i + 1}/${inputNodes.length}] Downloading: ${inputNode.id}`);
       const localPath = await downloadAsset(nodeId, url);
       localPaths.push(localPath);
     }
@@ -105,8 +97,6 @@ export async function executeMergeVideos(pipelineId: string, nodeId: string): Pr
     await validateInputVideos(localPaths);
 
     // 6. Merge videos with FFmpeg
-    console.log("[Step 6/7] Merging videos with FFmpeg...");
-
     // Create temp output directory
     const tempDir = join(process.cwd(), "tmp", "outputs");
     if (!existsSync(tempDir)) {
@@ -117,11 +107,8 @@ export async function executeMergeVideos(pipelineId: string, nodeId: string): Pr
 
     const { duration, size } = await mergeVideos(localPaths, tempOutputPath);
 
-    console.log(`  Merged: ${duration.toFixed(2)}s, ${(size / 1024 / 1024).toFixed(2)}MB`);
-
     // 7. Upload to S3
-    console.log("[Step 7/7] Uploading result to S3...");
-    const { url, key } = await uploadAsset(tempOutputPath, pipelineId, nodeId);
+    const { key } = await uploadAsset(tempOutputPath, pipelineId, nodeId);
 
     // 8. Update database with completion
     const output: NodeOutput = {
@@ -132,13 +119,6 @@ export async function executeMergeVideos(pipelineId: string, nodeId: string): Pr
     };
 
     await setNodeCompleted(pipelineId, nodeId, output);
-
-    console.log(`\n${"=".repeat(60)}`);
-    console.log(`[Executor] SUCCESS: ${pipelineId}/${nodeId}`);
-    console.log(`  S3: ${url}`);
-    console.log(`  Duration: ${duration.toFixed(2)}s`);
-    console.log(`  Size: ${(size / 1024 / 1024).toFixed(2)}MB`);
-    console.log(`${"=".repeat(60)}\n`);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
 
@@ -153,11 +133,10 @@ export async function executeMergeVideos(pipelineId: string, nodeId: string): Pr
     throw error;
   } finally {
     // Clean up temporary output file
-    if (tempOutputPath && existsSync(tempOutputPath)) {
+    if (tempOutputPath !== null && tempOutputPath !== undefined && existsSync(tempOutputPath)) {
       try {
         await unlink(tempOutputPath);
-        console.log(`[Cleanup] Deleted temp file: ${tempOutputPath}`);
-      } catch (error) {
+      } catch {
         console.warn(`[Cleanup] Failed to delete temp file: ${tempOutputPath}`);
       }
     }

@@ -5,18 +5,21 @@
  * Integrates with local cache to avoid redundant downloads.
  */
 
-import { S3Client, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 import { createReadStream } from "fs";
-import { stat } from "fs/promises";
 import { randomUUID } from "crypto";
 import { getCachedPath, saveToCacheAndReturn } from "./cache";
 
 // Initialize S3 client
 const s3Client = new S3Client({
-  region: process.env.AWS_REGION || "us-east-1",
+  region:
+    process.env.AWS_REGION !== null && process.env.AWS_REGION !== undefined ? process.env.AWS_REGION : "us-east-1",
   credentials:
-    process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
+    process.env.AWS_ACCESS_KEY_ID !== null &&
+    process.env.AWS_ACCESS_KEY_ID !== undefined &&
+    process.env.AWS_SECRET_ACCESS_KEY !== null &&
+    process.env.AWS_SECRET_ACCESS_KEY !== undefined
       ? {
           accessKeyId: process.env.AWS_ACCESS_KEY_ID,
           secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
@@ -24,7 +27,8 @@ const s3Client = new S3Client({
       : undefined // Use default credential chain if not provided
 });
 
-const DEFAULT_BUCKET = process.env.AWS_S3_BUCKET || "";
+const DEFAULT_BUCKET =
+  process.env.AWS_S3_BUCKET !== null && process.env.AWS_S3_BUCKET !== undefined ? process.env.AWS_S3_BUCKET : "";
 
 /**
  * Parses an S3 URL and returns bucket and key
@@ -76,11 +80,9 @@ function parseS3Url(url: string): { bucket: string; key: string } {
 export async function downloadAsset(nodeId: string, url: string): Promise<string> {
   // Check cache first
   const cachedPath = getCachedPath(nodeId, url);
-  if (cachedPath) {
+  if (cachedPath !== null && cachedPath !== undefined) {
     return cachedPath;
   }
-
-  console.log(`[S3] Downloading: ${url}`);
 
   const { bucket, key } = parseS3Url(url);
 
@@ -104,10 +106,9 @@ export async function downloadAsset(nodeId: string, url: string): Promise<string
   }
 
   const buffer = Buffer.concat(chunks);
-  console.log(`[S3] Downloaded: ${url} (${buffer.length} bytes)`);
 
   // Save to cache and return path
-  return await saveToCacheAndReturn(nodeId, url, buffer);
+  return saveToCacheAndReturn(nodeId, url, buffer);
 }
 
 /**
@@ -131,13 +132,13 @@ export async function uploadAsset(
 
   // Generate secure random UUID for filename
   const uuid = randomUUID();
-  const extension = filePath.match(/\.[^.]+$/)?.[0] || ".mp4";
+  const extension =
+    filePath.match(/\.[^.]+$/)?.[0] !== null && filePath.match(/\.[^.]+$/)?.[0] !== undefined
+      ? filePath.match(/\.[^.]+$/)?.[0]
+      : ".mp4";
   const key = `${pipelineId}/${nodeId}/${uuid}${extension}`;
 
-  console.log(`[S3] Uploading: ${filePath} -> s3://${bucket}/${key}`);
-
   const fileStream = createReadStream(filePath);
-  const fileStats = await stat(filePath);
 
   const upload = new Upload({
     client: s3Client,
@@ -151,9 +152,7 @@ export async function uploadAsset(
 
   await upload.done();
 
-  const url = `https://${bucket}.s3.${process.env.AWS_REGION || "us-east-1"}.amazonaws.com/${key}`;
-
-  console.log(`[S3] Uploaded: ${url} (${fileStats.size} bytes)`);
+  const url = `https://${bucket}.s3.${process.env.AWS_REGION !== null && process.env.AWS_REGION !== undefined ? process.env.AWS_REGION : "us-east-1"}.amazonaws.com/${key}`;
 
   return { url, key };
 }

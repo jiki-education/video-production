@@ -31,9 +31,6 @@ export async function mergeVideos(
     throw new Error("At least 2 videos required for merging");
   }
 
-  console.log(`[FFmpeg] Merging ${inputPaths.length} videos`);
-  console.log(`[FFmpeg] Output: ${outputPath}`);
-
   // Create concat demuxer file list
   const listPath = join(process.cwd(), "tmp", `concat-${randomUUID()}.txt`);
   const listContent = inputPaths.map((path) => `file '${path}'`).join("\n");
@@ -48,14 +45,7 @@ export async function mergeVideos(
     // -c copy: copy streams without re-encoding (fast)
     const command = `ffmpeg -f concat -safe 0 -i "${listPath}" -c copy "${outputPath}"`;
 
-    console.log(`[FFmpeg] Executing: ${command}`);
-
-    const { stdout, stderr } = await execAsync(command);
-
-    // FFmpeg outputs to stderr by default
-    if (stderr) {
-      console.log(`[FFmpeg] Output:\n${stderr}`);
-    }
+    const { stderr } = await execAsync(command);
 
     // Get output file stats
     const stats = await stat(outputPath);
@@ -71,8 +61,6 @@ export async function mergeVideos(
       duration = hours * 3600 + minutes * 60 + seconds;
     }
 
-    console.log(`[FFmpeg] Success: ${stats.size} bytes, ${duration.toFixed(2)}s`);
-
     return {
       duration,
       size: stats.size
@@ -80,7 +68,7 @@ export async function mergeVideos(
   } catch (error) {
     const err = error as Error & { stdout?: string; stderr?: string };
     console.error(`[FFmpeg] Error: ${err.message}`);
-    if (err.stderr) {
+    if (err.stderr !== null && err.stderr !== undefined) {
       console.error(`[FFmpeg] stderr:\n${err.stderr}`);
     }
     throw new Error(`FFmpeg merge failed: ${err.message}`);
@@ -88,7 +76,7 @@ export async function mergeVideos(
     // Clean up concat list file
     try {
       await unlink(listPath);
-    } catch (error) {
+    } catch {
       console.warn(`[FFmpeg] Failed to delete concat list: ${listPath}`);
     }
   }
@@ -104,7 +92,7 @@ export async function validateInputVideos(inputPaths: string[]): Promise<void> {
   for (const path of inputPaths) {
     try {
       await stat(path);
-    } catch (error) {
+    } catch {
       throw new Error(`Input video not found: ${path}`);
     }
   }

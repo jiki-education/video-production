@@ -34,8 +34,6 @@ export async function setNodeStarted(pipelineId: string, nodeId: string): Promis
   `,
     [pipelineId, nodeId]
   );
-
-  console.log(`[DB] Node started: ${pipelineId}/${nodeId}`);
 }
 
 /**
@@ -64,8 +62,6 @@ export async function setNodeCompleted(pipelineId: string, nodeId: string, outpu
   `,
     [pipelineId, nodeId, output]
   );
-
-  console.log(`[DB] Node completed: ${pipelineId}/${nodeId}`);
 }
 
 /**

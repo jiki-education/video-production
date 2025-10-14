@@ -5,7 +5,8 @@
  * Supports range requests for proper video seeking.
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { stat, open } from "fs/promises";
 import { createReadStream } from "fs";
 import { getNode } from "@/pipeline/lib/db-executors";
@@ -37,11 +38,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
       videoUrl = node.asset.source;
     }
     // Check output nodes
-    else if (node.output?.type === "video" && node.output.s3Key) {
+    else if (node.output?.type === "video" && node.output.s3Key !== undefined && node.output.s3Key !== null) {
       videoUrl = `s3://${process.env.AWS_S3_BUCKET}/${node.output.s3Key}`;
     }
 
-    if (!videoUrl) {
+    if (videoUrl === null || videoUrl === undefined) {
       return NextResponse.json({ error: "Node has no video output" }, { status: 404 });
     }
 
@@ -55,12 +56,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // 5. Handle range requests (for video seeking)
     const range = request.headers.get("range");
 
-    if (!range) {
+    if (range === null || range === undefined) {
       // No range request - send entire file
       const fileHandle = await open(filePath, "r");
       const stream = fileHandle.createReadStream();
 
-      return new NextResponse(stream as any, {
+      return new NextResponse(stream as unknown as BodyInit, {
         status: 200,
         headers: {
           "Content-Type": "video/mp4",
@@ -79,7 +80,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // Create read stream for range
     const stream = createReadStream(filePath, { start, end });
 
-    return new NextResponse(stream as any, {
+    return new NextResponse(stream as unknown as BodyInit, {
       status: 206, // Partial Content
       headers: {
         "Content-Range": `bytes ${start}-${end}/${fileSize}`,

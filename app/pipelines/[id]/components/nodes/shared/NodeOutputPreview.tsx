@@ -62,7 +62,7 @@ export default function NodeOutputPreview({ node }: NodeOutputPreviewProps) {
     <div className="border-t border-gray-200">
       {dataType === "image" && previewUrl != null ? (
         <img src={previewUrl} alt="Output preview" className="w-full object-cover" />
-      ) : dataType === "video" && apiVideoUrl && isCompleted ? (
+      ) : dataType === "video" && apiVideoUrl !== null && apiVideoUrl !== undefined && isCompleted ? (
         <video src={apiVideoUrl} controls muted className="w-full bg-black" style={{ maxHeight: "200px" }}>
           Your browser does not support video playback.
         </video>
@@ -75,7 +75,7 @@ export default function NodeOutputPreview({ node }: NodeOutputPreviewProps) {
             {node.status === "failed" && "Failed"}
           </span>
         </div>
-      ) : dataType === "audio" && apiVideoUrl && isCompleted ? (
+      ) : dataType === "audio" && apiVideoUrl !== null && apiVideoUrl !== undefined && isCompleted ? (
         <div className="w-full bg-gray-100 p-4">
           <audio src={apiVideoUrl} controls className="w-full">
             Your browser does not support audio playback.

@@ -84,7 +84,12 @@ async function seedPipeline(pipelineData: PipelineJSON) {
 
         // For asset nodes with S3 URLs, populate output field
         let output = null;
-        if (node.type === "asset" && node.asset?.source.startsWith("s3://")) {
+        if (
+          node.type === "asset" &&
+          node.asset !== null &&
+          node.asset !== undefined &&
+          node.asset.source.startsWith("s3://")
+        ) {
           // Parse S3 URL to extract key
           const s3Url = node.asset.source;
           const key = s3Url.replace(/^s3:\/\/[^/]+\//, ""); // Remove s3://bucket/

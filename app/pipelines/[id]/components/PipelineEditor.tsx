@@ -307,7 +307,13 @@ export default function PipelineEditor({ pipeline, nodes: initialNodes, onRefres
       />
 
       {/* Editor Panel */}
-      <EditorPanel selectedNode={selectedNode} pipelineId={pipeline.id} onDelete={handleDeleteFromPanel} />
+      <EditorPanel
+        selectedNode={selectedNode}
+        pipelineId={pipeline.id}
+        allNodes={nodes}
+        onDelete={handleDeleteFromPanel}
+        onRefresh={onRefresh}
+      />
     </div>
   );
 }

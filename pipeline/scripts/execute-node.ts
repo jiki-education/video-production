@@ -26,13 +26,6 @@ async function main() {
 
   const [pipelineId, nodeId] = args;
 
-  console.log("\n" + "=".repeat(60));
-  console.log("Jiki Video Pipeline - Node Executor");
-  console.log("=".repeat(60));
-  console.log(`Pipeline: ${pipelineId}`);
-  console.log(`Node: ${nodeId}`);
-  console.log("=".repeat(60) + "\n");
-
   try {
     // Load node to determine type
     const node = await getNode(pipelineId, nodeId);
@@ -41,9 +34,6 @@ async function main() {
       throw new Error(`Node not found: ${pipelineId}/${nodeId}`);
     }
 
-    console.log(`Node type: ${node.type}`);
-    console.log(`Current status: ${node.status}\n`);
-
     // Dispatch to appropriate executor
     switch (node.type) {
       case "merge-videos":
@@ -51,7 +41,6 @@ async function main() {
         break;
 
       case "asset":
-        console.log("Asset nodes don't require execution (already completed)");
         break;
 
       case "talking-head":
@@ -63,12 +52,8 @@ async function main() {
         throw new Error(`Executor not yet implemented for node type: ${node.type}`);
 
       default:
-        throw new Error(`Unknown node type: ${(node as any).type}`);
+        throw new Error(`Unknown node type: ${node.type}`);
     }
-
-    console.log("\n" + "=".repeat(60));
-    console.log("Execution completed successfully!");
-    console.log("=".repeat(60) + "\n");
 
     process.exit(0);
   } catch (error) {
@@ -78,7 +63,7 @@ async function main() {
 
     if (error instanceof Error) {
       console.error("\nError:", error.message);
-      if (error.stack) {
+      if (error.stack !== null && error.stack !== undefined) {
         console.error("\nStack trace:");
         console.error(error.stack);
       }

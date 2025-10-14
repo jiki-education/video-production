@@ -31,7 +31,10 @@ function sanitizeUrl(url: string): string {
   // Extract extension from URL if possible
   const urlObj = new URL(url.startsWith("http") ? url : `http://dummy/${url}`);
   const pathname = urlObj.pathname;
-  const ext = pathname.match(/\.[^.]+$/)?.[0] || "";
+  const ext =
+    pathname.match(/\.[^.]+$/)?.[0] !== null && pathname.match(/\.[^.]+$/)?.[0] !== undefined
+      ? pathname.match(/\.[^.]+$/)?.[0]
+      : "";
   return `${hash}${ext}`;
 }
 
@@ -62,11 +65,9 @@ export function getCachedPath(nodeId: string, url: string): string | null {
   const path = getCachePath(cacheKey);
 
   if (existsSync(path)) {
-    console.log(`[Cache] HIT: ${cacheKey}`);
     return path;
   }
 
-  console.log(`[Cache] MISS: ${cacheKey}`);
   return null;
 }
 
@@ -85,7 +86,6 @@ export async function saveToCacheAndReturn(nodeId: string, url: string, buffer: 
   const path = getCachePath(cacheKey);
 
   await writeFile(path, buffer);
-  console.log(`[Cache] SAVED: ${cacheKey} (${buffer.length} bytes)`);
 
   return path;
 }

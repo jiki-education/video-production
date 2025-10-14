@@ -230,3 +230,74 @@ export async function connectNodes(
   // Update pipeline timestamp
   await pool.query("UPDATE pipelines SET updated_at = NOW() WHERE id = $1", [pipelineId]);
 }
+
+/**
+ * Reorders the inputs array for a specific input key on a node
+ *
+ * Updates the order of node IDs in targetNode.inputs[inputKey] array
+ * and sets the node status to 'pending' since the pipeline structure changed.
+ *
+ * @param pipelineId - The pipeline ID
+ * @param nodeId - The node ID to update
+ * @param inputKey - The input key containing the array to reorder
+ * @param newOrder - The new array of node IDs in desired order
+ *
+ * Example:
+ *   await reorderNodeInputs('lesson-001', 'final_video', 'segments', ['intro', 'body', 'outro'])
+ *   // Sets final_video.inputs.segments = ['intro', 'body', 'outro']
+ *   // Sets final_video.status = 'pending'
+ */
+export async function reorderNodeInputs(
+  pipelineId: string,
+  nodeId: string,
+  inputKey: string,
+  newOrder: string[]
+): Promise<void> {
+  const pool = getPool();
+
+  // Validate node exists
+  const nodeResult = await pool.query("SELECT * FROM nodes WHERE pipeline_id = $1 AND id = $2", [pipelineId, nodeId]);
+
+  if (nodeResult.rows.length === 0) {
+    throw new Error(`Node not found: ${pipelineId}/${nodeId}`);
+  }
+
+  const node = nodeResult.rows[0];
+  const existingInput = node.inputs[inputKey];
+
+  // Validate that the input key exists and is an array
+  if (!Array.isArray(existingInput)) {
+    throw new Error(`Input key "${inputKey}" is not an array for node: ${pipelineId}/${nodeId}`);
+  }
+
+  // Validate that newOrder contains the same node IDs (just reordered)
+  const existingSet = new Set(existingInput);
+  const newSet = new Set(newOrder);
+
+  if (existingSet.size !== newSet.size || ![...existingSet].every((id) => newSet.has(id))) {
+    throw new Error(
+      `New order must contain the same node IDs as existing input. Expected: [${[...existingSet].join(", ")}], Got: [${newOrder.join(", ")}]`
+    );
+  }
+
+  // Update the input array and set status to pending
+  // Using jsonb_set to update only the specific input key
+  await pool.query(
+    `
+    UPDATE nodes
+    SET
+      inputs = jsonb_set(inputs, $1, $2::jsonb),
+      status = 'pending'
+    WHERE pipeline_id = $3 AND id = $4
+  `,
+    [
+      `{${inputKey}}`, // JSONB path
+      JSON.stringify(newOrder), // New array as JSON
+      pipelineId,
+      nodeId
+    ]
+  );
+
+  // Update pipeline timestamp
+  await pool.query("UPDATE pipelines SET updated_at = NOW() WHERE id = $1", [pipelineId]);
+}

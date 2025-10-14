@@ -14,7 +14,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createNode, deleteNode, connectNodes } from "@/lib/db-operations";
+import { createNode, deleteNode, connectNodes, reorderNodeInputs } from "@/lib/db-operations";
 import type { CreateNodeInput } from "@/lib/types";
 
 // ============================================================================
@@ -110,6 +110,39 @@ export async function connectNodesAction(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to connect nodes"
+    };
+  }
+}
+
+/**
+ * Reorders the inputs array for a specific input key on a node
+ *
+ * Updates the order of node IDs and sets status to 'pending'.
+ *
+ * @param pipelineId - The pipeline ID
+ * @param nodeId - The node ID to update
+ * @param inputKey - The input key containing the array to reorder
+ * @param newOrder - The new array of node IDs in desired order
+ * @returns Success status or error message
+ *
+ * Example:
+ *   const result = await reorderInputsAction(
+ *     'lesson-001',
+ *     'final_video',
+ *     'segments',
+ *     ['intro', 'body', 'outro']
+ *   );
+ */
+export async function reorderInputsAction(pipelineId: string, nodeId: string, inputKey: string, newOrder: string[]) {
+  try {
+    await reorderNodeInputs(pipelineId, nodeId, inputKey, newOrder);
+    revalidatePath(`/pipelines/${pipelineId}`);
+    return { success: true };
+  } catch (error) {
+    console.error("Error reordering inputs:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to reorder inputs"
     };
   }
 }
