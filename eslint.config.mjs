@@ -104,5 +104,17 @@ export default [
     rules: {
       "no-console": "off"
     }
+  },
+
+  // Jest config files - allow Node.js globals
+  {
+    files: ["jest.config.js", "jest-puppeteer.config.js"],
+    languageOptions: {
+      globals: {
+        module: "readonly",
+        require: "readonly",
+        process: "readonly"
+      }
+    }
   }
 ];

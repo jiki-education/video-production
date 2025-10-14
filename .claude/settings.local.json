@@ -40,7 +40,9 @@
       "Bash(psql:*)",
       "Bash(pnpm db:migrate-inputs:*)",
       "WebFetch(domain:reactflow.dev)",
-      "Bash(pnpm prettier:*)"
+      "Bash(pnpm prettier:*)",
+      "Bash(pnpm test:e2e:*)",
+      "Bash(pkill:*)"
     ],
     "deny": [],
     "ask": []
