@@ -8,7 +8,6 @@
 "use client";
 
 import { useState, useCallback, useMemo, useRef } from "react";
-import { useRouter } from "next/navigation";
 import type { Node as ReactFlowNode, Edge } from "@xyflow/react";
 import type { Node } from "@/lib/nodes/types";
 import type { Pipeline } from "@/lib/types";
@@ -21,11 +20,11 @@ import { getOutputHandleColorValue } from "@/lib/nodes/display-helpers";
 interface PipelineEditorProps {
   pipeline: Pipeline;
   nodes: Node[];
+  onRefresh: () => void;
+  onRelayout: () => void;
 }
 
-export default function PipelineEditor({ pipeline, nodes: initialNodes }: PipelineEditorProps) {
-  const router = useRouter();
-
+export default function PipelineEditor({ pipeline, nodes: initialNodes, onRefresh, onRelayout }: PipelineEditorProps) {
   // Local state - source of truth for UI
   const [nodes, setNodes] = useState<Node[]>(initialNodes);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -141,12 +140,13 @@ export default function PipelineEditor({ pipeline, nodes: initialNodes }: Pipeli
     return layouted;
   }, [reactFlowNodes, edges, nodePositions]);
 
-  // Manual re-layout function
-  const handleRelayout = useCallback(() => {
+  // Manual re-layout function - call parent's callback when triggered
+  useCallback(() => {
     // Force re-layout by clearing positions
     setNodePositions({});
     hasInitialLayout.current = false;
-  }, []);
+    onRelayout();
+  }, [onRelayout]);
 
   // Handle node selection
   const handleNodeSelect = useCallback((nodeId: string | null) => {
@@ -282,10 +282,10 @@ export default function PipelineEditor({ pipeline, nodes: initialNodes }: Pipeli
     [handleNodesDelete]
   );
 
-  // Manual refresh from database
-  const handleRefresh = useCallback(() => {
-    router.refresh();
-  }, [router]);
+  // Manual refresh from database - call parent's callback when triggered
+  useCallback(() => {
+    onRefresh();
+  }, [onRefresh]);
 
   return (
     <div className="flex-1 flex overflow-hidden relative">
@@ -295,24 +295,6 @@ export default function PipelineEditor({ pipeline, nodes: initialNodes }: Pipeli
           Saving...
         </div>
       )}
-
-      {/* Control buttons */}
-      <div className="absolute top-4 right-[25rem] z-50 flex gap-2">
-        <button
-          onClick={handleRefresh}
-          className="bg-white hover:bg-gray-50 border border-gray-300 px-3 py-1.5 rounded shadow text-sm font-medium text-gray-700 transition-colors"
-          title="Refresh from database (sync execution state)"
-        >
-          🔄 Refresh
-        </button>
-        <button
-          onClick={handleRelayout}
-          className="bg-white hover:bg-gray-50 border border-gray-300 px-3 py-1.5 rounded shadow text-sm font-medium text-gray-700 transition-colors"
-          title="Re-run auto-layout"
-        >
-          ⚡ Re-layout
-        </button>
-      </div>
 
       {/* Flow Canvas */}
       <FlowCanvas

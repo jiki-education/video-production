@@ -2,9 +2,7 @@ import Link from "next/link";
 import { query } from "@/lib/db";
 import { nodesFromDB } from "@/lib/nodes/factory";
 import type { Pipeline, Node as DBNode } from "@/lib/types";
-import PipelineHeader from "./components/PipelineHeader";
-import PipelineFooter from "./components/PipelineFooter";
-import PipelineEditor from "./components/PipelineEditor";
+import PipelineLayout from "./components/PipelineLayout";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -64,11 +62,7 @@ export default async function PipelinePage({ params }: PageProps) {
 
   return (
     <div className="h-screen flex flex-col">
-      <PipelineHeader pipelineId={id} />
-
-      <PipelineEditor pipeline={pipeline} nodes={domainNodes} />
-
-      <PipelineFooter />
+      <PipelineLayout pipelineId={id} pipeline={pipeline} nodes={domainNodes} />
     </div>
   );
 }
