@@ -9,8 +9,8 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { stat, open } from "fs/promises";
 import { createReadStream } from "fs";
-import { getNode } from "@/pipeline/lib/db-executors";
-import { downloadAsset } from "@/pipeline/lib/storage/s3";
+import { getNode } from "@/lib/pipeline/db-executors";
+import { downloadAsset } from "@/lib/pipeline/storage/s3";
 
 interface RouteContext {
   params: Promise<{

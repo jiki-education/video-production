@@ -11,8 +11,8 @@
  */
 
 import "dotenv/config";
-import { getNode } from "../lib/db-executors";
-import { executeMergeVideos } from "../lib/executors/merge-videos";
+import { getNode } from "../db-executors";
+import { executeMergeVideos } from "../executors/merge-videos";
 import { closePool } from "@/lib/db";
 
 async function main() {
