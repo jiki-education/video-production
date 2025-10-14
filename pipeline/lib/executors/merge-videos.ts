@@ -13,6 +13,7 @@ import { getNode, getNodes, setNodeStarted, setNodeCompleted, setNodeFailed } fr
 import { downloadAsset, uploadAsset } from "../storage/s3";
 import { mergeVideos, validateInputVideos } from "../ffmpeg/merge";
 import { isMergeVideosNode } from "@/lib/nodes/types";
+import { nodeFromDB, nodesFromDB } from "@/lib/nodes/factory";
 import type { NodeOutput } from "@/lib/types";
 
 /**
@@ -31,11 +32,14 @@ export async function executeMergeVideos(pipelineId: string, nodeId: string): Pr
   try {
     // 1. Load node from database
     console.log("[Step 1/7] Loading node from database...");
-    const node = await getNode(pipelineId, nodeId);
+    const dbNode = await getNode(pipelineId, nodeId);
 
-    if (!node) {
+    if (!dbNode) {
       throw new Error(`Node not found: ${pipelineId}/${nodeId}`);
     }
+
+    // Convert to domain node
+    const node = nodeFromDB(dbNode);
 
     // 2. Validate node type
     console.log("[Step 2/7] Validating node type...");
@@ -61,13 +65,16 @@ export async function executeMergeVideos(pipelineId: string, nodeId: string): Pr
 
     console.log(`  Found ${segmentIds.length} input segments: ${segmentIds.join(", ")}`);
 
-    const inputNodes = await getNodes(pipelineId, segmentIds);
+    const dbInputNodes = await getNodes(pipelineId, segmentIds);
 
-    if (inputNodes.length !== segmentIds.length) {
-      const foundIds = inputNodes.map((n) => n.id);
+    if (dbInputNodes.length !== segmentIds.length) {
+      const foundIds = dbInputNodes.map((n) => n.id);
       const missingIds = segmentIds.filter((id) => !foundIds.includes(id));
       throw new Error(`Input segments not found: ${missingIds.join(", ")}`);
     }
+
+    // Convert to domain nodes
+    const inputNodes = nodesFromDB(dbInputNodes);
 
     // 5. Download input videos
     console.log("[Step 5/7] Downloading input videos...");

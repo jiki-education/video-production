@@ -24,7 +24,6 @@ export default function MergeVideosNode({ data, selected }: MergeVideosNodeProps
   const { node } = data;
   const statusStyle = getNodeStatusStyle(node.status);
   const displayName = getNodeDisplayName(node);
-  const segmentCount = node.inputs.segments?.length ?? 0;
 
   return (
     <div
@@ -39,17 +38,6 @@ export default function MergeVideosNode({ data, selected }: MergeVideosNodeProps
     >
       <NodeHeader type={node.type} title={node.title} displayName={displayName} status={node.status} />
       <NodeOutputPreview node={node} />
-
-      <div className="px-4 py-3 text-xs text-gray-600 space-y-1">
-        <div>
-          <span className="font-semibold">Segments:</span> {segmentCount}
-        </div>
-        {node.config.transitions != null && node.config.transitions !== "" && (
-          <div>
-            <span className="font-semibold">Transitions:</span> {String(node.config.transitions)}
-          </div>
-        )}
-      </div>
 
       {/* Handles */}
       <NodeInputHandles nodeType={node.type} />
