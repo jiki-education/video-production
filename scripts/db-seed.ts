@@ -82,6 +82,19 @@ async function seedPipeline(pipelineData: PipelineJSON) {
         // Assets are immediately available, other nodes need execution
         const status = node.type === "asset" ? "completed" : "pending";
 
+        // For asset nodes with S3 URLs, populate output field
+        let output = null;
+        if (node.type === "asset" && node.asset?.source.startsWith("s3://")) {
+          // Parse S3 URL to extract key
+          const s3Url = node.asset.source;
+          const key = s3Url.replace(/^s3:\/\/[^/]+\//, ""); // Remove s3://bucket/
+
+          output = {
+            type: node.asset.type,
+            s3Key: key
+          };
+        }
+
         await client.query(
           `
           INSERT INTO nodes (id, pipeline_id, title, type, inputs, config, asset, status, metadata, output)
@@ -97,7 +110,7 @@ async function seedPipeline(pipelineData: PipelineJSON) {
             node.asset || null,
             status,
             null,
-            null
+            output
           ]
         );
       }

@@ -4,6 +4,8 @@
  * Displays node output based on type (image, video, audio, text, or placeholder)
  */
 
+"use client";
+
 import type { Node } from "@/lib/nodes/types";
 import { getOutputPreviewUrl, getOutputDataType } from "@/lib/nodes/display-helpers";
 
@@ -25,6 +27,14 @@ export default function NodeOutputPreview({ node }: NodeOutputPreviewProps) {
   }
 
   const hasPreview = previewUrl !== null && previewUrl !== "";
+
+  // Determine if video/audio is ready to play
+  const isCompleted = node.status === "completed";
+
+  // For videos/audio, construct API URL
+  const pipelineId = node.pipelineId;
+  const apiVideoUrl =
+    isCompleted && (dataType === "video" || dataType === "audio") ? `/api/videos/${pipelineId}/${node.id}` : null;
 
   if (!hasPreview) {
     return (
@@ -52,19 +62,33 @@ export default function NodeOutputPreview({ node }: NodeOutputPreviewProps) {
     <div className="border-t border-gray-200">
       {dataType === "image" && previewUrl != null ? (
         <img src={previewUrl} alt="Output preview" className="w-full object-cover" />
+      ) : dataType === "video" && apiVideoUrl && isCompleted ? (
+        <video src={apiVideoUrl} controls muted className="w-full bg-black" style={{ maxHeight: "200px" }}>
+          Your browser does not support video playback.
+        </video>
       ) : dataType === "video" ? (
         <div className="w-full h-32 bg-gray-100 flex flex-col items-center justify-center gap-1">
           <span className="text-4xl">🎬</span>
-          {node.type === "asset" && node.asset != null && (
-            <span className="text-xs text-gray-600">{getFileTypeLabel(node.asset.type)}</span>
-          )}
+          <span className="text-xs text-gray-600">
+            {node.status === "pending" && "Pending"}
+            {node.status === "in_progress" && "Processing..."}
+            {node.status === "failed" && "Failed"}
+          </span>
+        </div>
+      ) : dataType === "audio" && apiVideoUrl && isCompleted ? (
+        <div className="w-full bg-gray-100 p-4">
+          <audio src={apiVideoUrl} controls className="w-full">
+            Your browser does not support audio playback.
+          </audio>
         </div>
       ) : dataType === "audio" ? (
         <div className="w-full h-16 bg-gray-100 flex flex-col items-center justify-center gap-1">
           <span className="text-2xl">🎵</span>
-          {node.type === "asset" && node.asset != null && (
-            <span className="text-xs text-gray-600">{getFileTypeLabel(node.asset.type)}</span>
-          )}
+          <span className="text-xs text-gray-600">
+            {node.status === "pending" && "Pending"}
+            {node.status === "in_progress" && "Processing..."}
+            {node.status === "failed" && "Failed"}
+          </span>
         </div>
       ) : (
         <div className="w-full h-16 bg-gray-100 flex flex-col items-center justify-center gap-1">

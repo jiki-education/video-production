@@ -32,6 +32,7 @@
     "lib/**/*",
     "test/**/*",
     "scripts/**/*",
+    "pipeline/**/*",
     "remotion.config.ts",
     "next.config.ts",
     "next-env.d.ts",

@@ -13,6 +13,7 @@
     "db:init": "tsx scripts/db-init.ts",
     "db:seed": "tsx scripts/db-seed.ts",
     "db:migrate-inputs": "tsx scripts/migrate-inputs-to-arrays.ts",
+    "exec:node": "tsx pipeline/scripts/execute-node.ts",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
@@ -29,6 +30,8 @@
   },
   "packageManager": "pnpm@10.10.0",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.908.0",
+    "@aws-sdk/lib-storage": "^3.908.0",
     "@remotion/bundler": "^4.0.357",
     "@remotion/cli": "^4.0.357",
     "@remotion/media-utils": "^4.0.357",
