@@ -18,7 +18,8 @@ import {
   type OnConnect,
   type OnNodesDelete,
   type NodeTypes,
-  type IsValidConnection
+  type IsValidConnection,
+  type NodeMouseHandler
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -119,6 +120,14 @@ export default function FlowCanvas({
     [onNodesDelete]
   );
 
+  // Handle node click (select)
+  const handleNodeClick: NodeMouseHandler = useCallback(
+    (_event, node) => {
+      onNodeSelect(node.id);
+    },
+    [onNodeSelect]
+  );
+
   // Handle canvas click (deselect)
   const handlePaneClick = useCallback(() => {
     onNodeSelect(null);
@@ -132,6 +141,7 @@ export default function FlowCanvas({
         nodeTypes={nodeTypes}
         onConnect={handleConnect}
         onNodesDelete={handleNodesDelete}
+        onNodeClick={handleNodeClick}
         onPaneClick={handlePaneClick}
         isValidConnection={isValidConnection}
         fitView

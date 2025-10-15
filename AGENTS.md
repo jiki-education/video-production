@@ -472,6 +472,63 @@ pnpm test:ui
 
 # Run with coverage
 pnpm test:coverage
+
+# Run E2E tests (Jest + Puppeteer)
+pnpm test:e2e
+```
+
+### E2E Testing (Jest + Puppeteer)
+
+E2E tests use Jest with Puppeteer to test the full application in a headless browser:
+
+**IMPORTANT Wait Strategy:**
+
+- **DO NOT use `waitUntil: "networkidle0"`** - It's 30% slower and unnecessary
+- **USE `waitUntil: "domcontentloaded"`** instead for faster tests
+- **ALWAYS add a 500ms delay after page load** to ensure React hydration completes before interacting with the page
+
+**Pattern:**
+
+```typescript
+// ✅ CORRECT: Fast and reliable
+await page.goto(`http://localhost:4000/pipelines/${id}`, {
+  waitUntil: "domcontentloaded" // Fast - DOM is ready
+});
+
+await page.waitForSelector(".react-flow", { timeout: 2000 });
+await page.waitForSelector(`[data-id="${nodeId}"]`, { timeout: 2000 });
+
+// Critical: Wait for React hydration to attach event handlers
+await new Promise((resolve) => setTimeout(resolve, 500));
+
+// Now safe to interact
+await page.click(`[data-id="${nodeId}"]`);
+
+// ❌ WRONG: Slow and unnecessary
+await page.goto(`http://localhost:4000/pipelines/${id}`, {
+  waitUntil: "networkidle0" // Waits for all network requests to settle
+});
+// No hydration delay - clicks may not work!
+await page.click(`[data-id="${nodeId}"]`);
+```
+
+**Why the 500ms delay?**
+
+- Next.js uses React hydration - the HTML renders first, then React attaches event handlers
+- Without the delay, elements exist in the DOM but clicks don't work yet
+- 500ms is the minimum reliable delay for React hydration to complete
+
+**Running E2E Tests:**
+
+```bash
+# Run in headless mode (CI)
+pnpm test:e2e
+
+# Run with visible browser (debugging)
+pnpm test:e2e:headful
+
+# Watch mode
+pnpm test:e2e:watch
 ```
 
 ### Test Database

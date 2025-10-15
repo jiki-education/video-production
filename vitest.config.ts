@@ -20,6 +20,9 @@ export default defineConfig({
     // Global test APIs (no need to import describe, it, expect)
     globals: true,
 
+    // Exclude E2E tests (they use Jest + Puppeteer)
+    exclude: ["**/node_modules/**", "**/test/e2e/**"],
+
     // Coverage configuration (optional)
     coverage: {
       provider: "v8",

@@ -1,195 +1,143 @@
-# Migration Plan: Move Execution to Rails API
+# Front-End Migration Guide: Rails API Integration
 
-## Overview
+## Executive Summary
 
-This document outlines the plan to migrate from the current Next.js-only architecture to a Rails API-orchestrated architecture for video production pipeline execution.
+**Goal:** Replace local Node.js execution with Rails API calls while keeping the visual editor unchanged.
 
-### Current Architecture (Before Migration)
+**What You're Doing:**
 
-```
-┌────────────────────────────────────────────────┐
-│        Next.js App (code-videos repo)          │
-│                                                │
-│  • Visual pipeline editor (React Flow)         │
-│  • Server Components (read DB)                 │
-│  • Server Actions (write DB)                   │
-│  • Execution engine (pipeline/ directory)      │
-│  • Direct DB updates for status/metadata       │
-└────────────────┬───────────────────────────────┘
-                 │
-                 ↓
-        ┌────────────────┐
-        │   PostgreSQL   │
-        └────────────────┘
-```
+- Add API client to call Rails backend for node execution
+- Add "Execute" button UI to trigger execution
+- Update status polling to show real-time progress
+- Remove local execution code after migration is complete
 
-### Target Architecture (After Migration)
+**What Stays the Same:**
 
-```
-┌────────────────────────────────────────────────┐
-│        Next.js App (code-videos repo)          │
-│                                                │
-│  • Visual pipeline editor (React Flow)         │
-│  • Server Components (read DB)                 │
-│  • Server Actions (ONLY structure updates)     │
-│  • Calls Rails API for execution               │
-└────────────────┬───────────────────────────────┘
-                 │
-                 │ POST /v1/video_production/.../execute
-                 │ GET  /v1/video_production/.../status
-                 ↓
-        ┌────────────────┐
-        │   Rails API    │
-        │   (../api)     │
-        │                │
-        │  • Sidekiq jobs│
-        │  • Lambda      │
-        │  • External APIs│
-        └────────┬───────┘
-                 │
-                 ↓
-        ┌────────────────┐
-        │   PostgreSQL   │
-        │   (shared)     │
-        └────────────────┘
-```
+- Visual pipeline editor (React Flow)
+- Node configuration UI
+- Database read operations (Server Components)
+- Structure updates (creating/deleting/connecting nodes)
 
 ---
 
-## What Stays in This Repo
+## Quick Start
 
-### Keep (No Changes)
+### 1. API Endpoints You'll Use
 
-1. **Next.js Visual Editor** (`app/pipelines/[id]/`)
-   - React Flow pipeline designer
-   - EditorPanel for node configuration
-   - FlowCanvas for visual graph
-   - All UI components
+The Rails API provides these endpoints (all under `/admin/video_production/`):
 
-2. **Remotion Code Generator** (`src/`)
-   - AnimatedCode component
-   - Timing calculations
-   - Scene configurations
-   - Rendering scripts (`scripts/render.ts`, `scripts/renderAll.ts`)
+```
+# Pipelines
+GET  /admin/video_production/pipelines
+GET  /admin/video_production/pipelines/:uuid
 
-3. **Database Read Operations**
-   - Server Components reading pipelines and nodes
-   - Display of status, metadata, output
-
-4. **Structure Update Server Actions**
-   - `createNodeAction()`
-   - `deleteNodeAction()`
-   - `connectNodesAction()`
-   - `reorderInputsAction()`
-   - These continue to update `type`, `inputs`, `config`, `asset`, `title`
-
-5. **Database Operations Library** (`lib/db-operations.ts`)
-   - Keep for Next.js to update structure
-   - Used by Server Actions for CRUD on nodes/pipelines
-
-6. **Testing Infrastructure** (`test/`)
-   - Keep all tests for visual editor
-   - Update e2e tests to mock Rails API calls instead of local execution
-
----
-
-## What Moves to Rails API
-
-### Remove from This Repo
-
-1. **Execution Engine** (`pipeline/` directory)
-   - `pipeline/scripts/execute-node.ts` → Rails command
-   - `pipeline/lib/executors/merge-videos.ts` → Rails executor
-   - `pipeline/lib/db-executors.ts` → Rails DB update methods
-   - `pipeline/lib/storage/s3.ts` → Rails S3 integration
-   - `pipeline/lib/ffmpeg/merge.ts` → Lambda function
-
-2. **Execution-Related Database Operations**
-   - `setNodeStarted()` → Rails partial update
-   - `setNodeCompleted()` → Rails partial update
-   - `setNodeFailed()` → Rails partial update
-
-3. **AWS SDK Dependencies**
-   - `@aws-sdk/client-s3`
-   - `@aws-sdk/lib-storage`
-   - These move to Rails Gemfile
-
----
-
-## Database Migration Strategy
-
-### Shared Database Approach
-
-**Both apps connect to the same PostgreSQL database:**
-
-```typescript
-// Next.js (.env)
-DATABASE_URL=postgresql://user:pass@host:5432/jiki_video_pipelines
-
-// Rails (config/database.yml)
-production:
-  url: <%= ENV['DATABASE_URL'] %>
+# Nodes
+GET  /admin/video_production/pipelines/:pipeline_uuid/nodes
+GET  /admin/video_production/pipelines/:pipeline_uuid/nodes/:uuid
+POST /admin/video_production/pipelines/:pipeline_uuid/nodes/:uuid/execute
+GET  /admin/video_production/pipelines/:pipeline_uuid/nodes/:uuid/status
 ```
 
-### Column Ownership (Critical!)
+**Important:** The API uses `uuid` (not `id`) as the primary key for pipelines and nodes.
 
-| Column                                       | Owner   | Purpose              |
-| -------------------------------------------- | ------- | -------------------- |
-| `type`, `inputs`, `config`, `asset`, `title` | Next.js | Structure (UI edits) |
-| `status`, `metadata`, `output`               | Rails   | Execution state      |
+### 2. Environment Setup
 
-**Both apps must use JSONB partial updates (`jsonb_set()`) to prevent conflicts.**
+```bash
+# .env.local (development)
+RAILS_API_URL=http://localhost:3061
 
-### Schema Migration
+# .env.production
+RAILS_API_URL=https://api.jiki.io
+```
 
-**Option 1: No Migration (Recommended)**
+### 3. Files You'll Create/Modify
 
-- Tables already exist in PostgreSQL
-- Rails creates models that point to existing tables
-- No schema changes needed
-- Zero downtime
+**New Files:**
 
-**Option 2: Rename Tables (If Desired)**
+- `lib/api-client.ts` - API client for Rails backend
+- `app/pipelines/[id]/components/StatusPoller.tsx` - Real-time status updates
 
-- Rename `pipelines` → `video_production_pipelines`
-- Rename `nodes` → `video_production_nodes`
-- Update Next.js `lib/db.ts` with new table names
-- Requires deployment coordination
+**Modified Files:**
+
+- `app/pipelines/[id]/actions.ts` - Add `executeNodeAction()`
+- `app/pipelines/[id]/components/nodes/shared/NodeHeader.tsx` - Add execute button
+- All node components - Wire up execute handler
+
+**Files to Delete (after migration):**
+
+- `pipeline/` entire directory (execution engine)
+- AWS SDK dependencies from `package.json`
 
 ---
 
-## Next.js Changes Required
+## Implementation Steps
 
-### 1. Add Rails API Client
+### Step 1: Create API Client
 
-Create an API client for calling Rails:
+Create a new file for all Rails API calls:
 
 ```typescript
 // lib/api-client.ts
 const API_BASE_URL = process.env.RAILS_API_URL || "http://localhost:3061";
 
-export async function executeNode(pipelineId: string, nodeId: string) {
-  const response = await fetch(`${API_BASE_URL}/v1/video_production/pipelines/${pipelineId}/nodes/${nodeId}/execute`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-      // Add auth token when ready
+interface ExecuteResponse {
+  status: "queued" | "error";
+  job_id?: string;
+  error?: string;
+}
+
+interface StatusResponse {
+  uuid: string;
+  status: "pending" | "in_progress" | "completed" | "failed";
+  metadata: {
+    startedAt?: string;
+    completedAt?: string;
+    jobId?: string;
+    cost?: number;
+    error?: string;
+  };
+  output?: {
+    s3Key?: string;
+    duration?: number;
+    size?: number;
+  };
+}
+
+/**
+ * Execute a node via Rails API (queues background job)
+ */
+export async function executeNode(pipelineUuid: string, nodeUuid: string): Promise<ExecuteResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/admin/video_production/pipelines/${pipelineUuid}/nodes/${nodeUuid}/execute`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+        // TODO: Add auth token when ready
+      }
     }
-  });
+  );
 
   if (!response.ok) {
-    throw new Error(`Execute failed: ${response.statusText}`);
+    const error = await response.text();
+    throw new Error(`Execute failed: ${response.statusText} - ${error}`);
   }
 
   return response.json();
 }
 
-export async function getNodeStatus(pipelineId: string, nodeId: string) {
-  const response = await fetch(`${API_BASE_URL}/v1/video_production/pipelines/${pipelineId}/nodes/${nodeId}/status`, {
-    headers: {
-      // Add auth token when ready
+/**
+ * Get current status of a node
+ */
+export async function getNodeStatus(pipelineUuid: string, nodeUuid: string): Promise<StatusResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/admin/video_production/pipelines/${pipelineUuid}/nodes/${nodeUuid}/status`,
+    {
+      headers: {
+        // TODO: Add auth token when ready
+      }
     }
-  });
+  );
 
   if (!response.ok) {
     throw new Error(`Status fetch failed: ${response.statusText}`);
@@ -199,9 +147,9 @@ export async function getNodeStatus(pipelineId: string, nodeId: string) {
 }
 ```
 
-### 2. Update Server Actions
+### Step 2: Add Execute Server Action
 
-Add new execution action:
+Add a new Server Action to trigger execution:
 
 ```typescript
 // app/pipelines/[id]/actions.ts
@@ -212,10 +160,15 @@ import { revalidatePath } from "next/cache";
 
 /**
  * Triggers node execution via Rails API
+ * Returns job ID or error
  */
 export async function executeNodeAction(pipelineId: string, nodeId: string) {
   try {
     const result = await executeNodeAPI(pipelineId, nodeId);
+
+    if (result.status === "error") {
+      return { success: false, error: result.error };
+    }
 
     // Revalidate to show "in_progress" status
     revalidatePath(`/pipelines/${pipelineId}`);
@@ -231,9 +184,9 @@ export async function executeNodeAction(pipelineId: string, nodeId: string) {
 }
 ```
 
-### 3. Add Play Button UI
+### Step 3: Add Execute Button to Node Header
 
-Update NodeHeader to show play button:
+Update the shared NodeHeader component to show an execute button for pending nodes:
 
 ```typescript
 // app/pipelines/[id]/components/nodes/shared/NodeHeader.tsx
@@ -243,6 +196,7 @@ interface NodeHeaderProps {
   displayName: string;
   status: string;
   onExecute?: () => void;  // New prop
+  isExecuting?: boolean;   // New prop
 }
 
 export default function NodeHeader({
@@ -250,7 +204,8 @@ export default function NodeHeader({
   title,
   displayName,
   status,
-  onExecute
+  onExecute,
+  isExecuting = false
 }: NodeHeaderProps) {
   const icon = NODE_ICONS[type] || "📦";
 
@@ -268,17 +223,24 @@ export default function NodeHeader({
         <div className="flex items-center gap-2">
           <StatusBadge status={status} />
 
-          {/* Play button for pending nodes */}
+          {/* Execute button for pending nodes (not asset nodes) */}
           {status === 'pending' && onExecute && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onExecute();
               }}
-              className="w-6 h-6 flex items-center justify-center rounded-full bg-green-100 hover:bg-green-200 transition-colors"
-              title="Execute node"
+              disabled={isExecuting}
+              className={`w-6 h-6 flex items-center justify-center rounded-full transition-colors ${
+                isExecuting
+                  ? 'bg-gray-100 cursor-wait'
+                  : 'bg-green-100 hover:bg-green-200'
+              }`}
+              title={isExecuting ? "Executing..." : "Execute node"}
             >
-              <span className="text-green-700 text-sm">▶</span>
+              <span className={`text-sm ${isExecuting ? 'text-gray-400' : 'text-green-700'}`}>
+                {isExecuting ? '...' : '▶'}
+              </span>
             </button>
           )}
         </div>
@@ -288,9 +250,9 @@ export default function NodeHeader({
 }
 ```
 
-### 4. Wire Up Execution in Node Components
+### Step 4: Wire Up Execute Handler in Node Components
 
-Update node components to handle execution:
+Update each node component to handle execution. Example for MergeVideosNode:
 
 ```typescript
 // app/pipelines/[id]/components/nodes/MergeVideosNode.tsx
@@ -307,16 +269,26 @@ export default function MergeVideosNode({ data, selected }: MergeVideosNodeProps
   const [isExecuting, setIsExecuting] = useState(false);
 
   const handleExecute = async () => {
+    if (isExecuting) return;
+
     setIsExecuting(true);
 
-    const result = await executeNodeAction(node.pipelineId, node.id);
+    try {
+      const result = await executeNodeAction(node.pipelineId, node.id);
 
-    if (!result.success) {
-      alert(`Failed to execute: ${result.error}`);
+      if (!result.success) {
+        alert(`Failed to execute: ${result.error}`);
+      }
+      // Success - status poller will handle UI updates
+    } catch (error) {
+      alert(`Execution error: ${error}`);
+    } finally {
+      setIsExecuting(false);
     }
-
-    setIsExecuting(false);
   };
+
+  // Only show execute button for non-asset nodes
+  const canExecute = node.type !== 'asset';
 
   return (
     <div onClick={data.onSelect} className="...">
@@ -325,7 +297,8 @@ export default function MergeVideosNode({ data, selected }: MergeVideosNodeProps
         title={node.title}
         displayName={displayName}
         status={node.status}
-        onExecute={handleExecute}
+        onExecute={canExecute ? handleExecute : undefined}
+        isExecuting={isExecuting}
       />
       {/* ... rest of component */}
     </div>
@@ -333,187 +306,221 @@ export default function MergeVideosNode({ data, selected }: MergeVideosNodeProps
 }
 ```
 
-### 5. Update Status Polling
+**Repeat for all node types:**
 
-Replace `router.refresh()` with API polling:
+- `TalkingHeadNode`
+- `GenerateAnimationNode`
+- `GenerateVoiceoverNode`
+- `RenderCodeNode`
+- `MixAudioNode`
+- `ComposeVideoNode`
+- `AssetNode` (no execute button needed)
+
+### Step 5: Add Status Polling Component
+
+Create a component that polls the API for status updates:
 
 ```typescript
 // app/pipelines/[id]/components/StatusPoller.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getNodeStatus } from "@/lib/api-client";
 
 interface StatusPollerProps {
   pipelineId: string;
-  nodeIds: string[]; // IDs of nodes currently in_progress
+  nodeIds: string[]; // UUIDs of nodes currently in_progress
 }
 
+/**
+ * Polls Rails API for status updates on in-progress nodes
+ * Refreshes the page when any node completes or fails
+ */
 export default function StatusPoller({ pipelineId, nodeIds }: StatusPollerProps) {
   const router = useRouter();
-  const [polling, setPolling] = useState(true);
 
   useEffect(() => {
-    if (nodeIds.length === 0) {
-      setPolling(false);
-      return;
-    }
+    if (nodeIds.length === 0) return;
 
     const interval = setInterval(async () => {
-      // Check status of all in_progress nodes
-      const updates = await Promise.all(nodeIds.map((nodeId) => getNodeStatus(pipelineId, nodeId)));
+      try {
+        // Check status of all in_progress nodes
+        const statuses = await Promise.all(nodeIds.map((nodeId) => getNodeStatus(pipelineId, nodeId)));
 
-      // If any status changed, refresh the page
-      const anyChanged = updates.some((update, idx) => update.status !== "in_progress");
+        // If any status changed from in_progress, refresh the page
+        const anyChanged = statuses.some((status) => status.status !== "in_progress");
 
-      if (anyChanged) {
-        router.refresh();
+        if (anyChanged) {
+          router.refresh();
+        }
+      } catch (error) {
+        console.error("Status polling error:", error);
+        // Don't throw - keep polling
       }
     }, 2000); // Poll every 2 seconds
 
     return () => clearInterval(interval);
   }, [pipelineId, nodeIds, router]);
 
-  return null;
+  return null; // No UI
 }
 ```
 
-### 6. Environment Variables
+### Step 6: Add Status Poller to Pipeline Page
 
-```bash
-# .env.local
-RAILS_API_URL=http://localhost:3061
+Update the main pipeline page to include the status poller:
 
-# .env.production
-RAILS_API_URL=https://api.jiki.io
+```typescript
+// app/pipelines/[id]/page.tsx
+import StatusPoller from "./components/StatusPoller";
+
+export default async function PipelinePage({ params }: { params: { id: string } }) {
+  const pipeline = await getPipelineWithNodes(params.id);
+
+  // Get IDs of nodes currently in progress
+  const inProgressNodeIds = pipeline.nodes
+    .filter((node) => node.status === 'in_progress')
+    .map((node) => node.id);
+
+  return (
+    <div className="h-screen flex flex-col">
+      <PipelineHeader pipeline={pipeline} />
+
+      {/* Poll for status updates */}
+      {inProgressNodeIds.length > 0 && (
+        <StatusPoller
+          pipelineId={pipeline.id}
+          nodeIds={inProgressNodeIds}
+        />
+      )}
+
+      <PipelineEditor pipeline={pipeline} />
+    </div>
+  );
+}
 ```
+
+---
+
+## Testing the Migration
+
+### Phase 1: Parallel Operation (Week 1-2)
+
+Keep both systems running side-by-side using a feature flag:
+
+```typescript
+// lib/feature-flags.ts
+export const USE_RAILS_API = process.env.NEXT_PUBLIC_USE_RAILS_API === "true";
+
+// In executeNodeAction:
+export async function executeNodeAction(pipelineId: string, nodeId: string) {
+  if (USE_RAILS_API) {
+    return executeViaRailsAPI(pipelineId, nodeId);
+  } else {
+    return executeLocally(pipelineId, nodeId); // Keep old code
+  }
+}
+```
+
+**Testing Steps:**
+
+1. Set `NEXT_PUBLIC_USE_RAILS_API=false` initially
+2. Verify existing execution still works
+3. Set `NEXT_PUBLIC_USE_RAILS_API=true`
+4. Test all node types via API
+5. Compare results (status, metadata, output)
+
+### Phase 2: Cutover (Week 3)
+
+1. Set `NEXT_PUBLIC_USE_RAILS_API=true` in production
+2. Monitor error rates and execution times
+3. Check database for race conditions (JSONB conflicts)
+4. Verify status polling updates UI correctly
+
+### Phase 3: Cleanup (Week 4)
+
+After 1 week of stable operation:
+
+1. Remove feature flag
+2. Delete `pipeline/` directory
+3. Remove AWS SDK dependencies: `pnpm remove @aws-sdk/client-s3 @aws-sdk/lib-storage`
+4. Remove old execution code
+5. Update tests to mock Rails API
+6. Update documentation
 
 ---
 
 ## Code Removal Checklist
 
-### Files to Delete
+### Files to Delete (After Migration)
 
 - [ ] `pipeline/scripts/execute-node.ts`
 - [ ] `pipeline/lib/executors/merge-videos.ts`
 - [ ] `pipeline/lib/db-executors.ts`
 - [ ] `pipeline/lib/storage/s3.ts`
 - [ ] `pipeline/lib/ffmpeg/merge.ts`
-- [ ] `pipeline/` entire directory (after verifying all extracted to Rails)
+- [ ] `pipeline/` entire directory
 
 ### Dependencies to Remove
 
-```json
-// package.json - Remove these:
-"@aws-sdk/client-s3": "^3.908.0",
-"@aws-sdk/lib-storage": "^3.908.0"
+```bash
+pnpm remove @aws-sdk/client-s3 @aws-sdk/lib-storage
 ```
-
-Run: `pnpm remove @aws-sdk/client-s3 @aws-sdk/lib-storage`
 
 ### Database Operations to Keep
 
-Keep in `lib/db-operations.ts`:
+Keep in `lib/db-operations.ts` (structure updates only):
 
-- `createNode()` - Structure updates
-- `deleteNode()` - Structure updates
-- `connectNodes()` - Structure updates
-- `updateNodeConfig()` - Structure updates (config JSONB)
-- `reorderNodeInputs()` - Structure updates
+- `createNode()` - Creating nodes
+- `deleteNode()` - Deleting nodes
+- `connectNodes()` - Connecting nodes
+- `updateNodeConfig()` - Updating config JSONB
+- `reorderNodeInputs()` - Reordering inputs
 
-Remove from `lib/db-operations.ts`:
+Remove from `lib/db-operations.ts` (Rails handles execution state):
 
-- `setNodeStarted()` - Rails handles execution state
-- `setNodeCompleted()` - Rails handles execution state
-- `setNodeFailed()` - Rails handles execution state
-
----
-
-## Testing the Migration
-
-### Phase 1: Parallel Operation
-
-Both systems run side-by-side:
-
-1. Keep existing Next.js execution code
-2. Add Rails API calls
-3. Add feature flag to choose execution method:
-
-```typescript
-// lib/feature-flags.ts
-export const USE_RAILS_API = process.env.USE_RAILS_API === "true";
-
-// In executeNodeAction:
-if (USE_RAILS_API) {
-  return await executeViaRailsAPI(pipelineId, nodeId);
-} else {
-  return await executeLocally(pipelineId, nodeId);
-}
-```
-
-4. Test Rails API with subset of nodes
-5. Compare results (status, metadata, output)
-6. Validate JSONB partial updates work correctly
-
-### Phase 2: Cutover
-
-1. Set `USE_RAILS_API=true` in production
-2. Monitor for errors
-3. If successful after 1 week, remove old code
-4. Delete `pipeline/` directory
-
-### Phase 3: Cleanup
-
-1. Remove feature flag
-2. Remove old execution code
-3. Update tests to mock Rails API
-4. Update documentation
+- `setNodeStarted()`
+- `setNodeCompleted()`
+- `setNodeFailed()`
 
 ---
 
-## Rollback Strategy
+## Updating Tests
 
-If migration fails:
+### E2E Tests
 
-1. Set `USE_RAILS_API=false`
-2. Next.js falls back to local execution
-3. Investigate Rails API issues
-4. Fix and retry
-
-**Important:** Keep old execution code until Rails API proven stable (minimum 1 week in production).
-
----
-
-## Testing Updates
-
-### Update E2E Tests
-
-Replace local execution with API mocks:
+Mock the Rails API instead of running local execution:
 
 ```typescript
 // test/e2e/merge-videos-execution.test.ts
-import { rest } from "msw";
 import { setupServer } from "msw/node";
+import { http, HttpResponse } from "msw";
 
 const server = setupServer(
-  rest.post(
-    "http://localhost:3061/v1/video_production/pipelines/:pipelineId/nodes/:nodeId/execute",
-    (req, res, ctx) => {
-      return res(ctx.status(200), ctx.json({ status: "queued", job_id: "test-job-123" }));
-    }
-  ),
+  // Mock execute endpoint
+  http.post("http://localhost:3061/admin/video_production/pipelines/:pipelineId/nodes/:nodeId/execute", () => {
+    return HttpResponse.json({
+      status: "queued",
+      job_id: "test-job-123"
+    });
+  }),
 
-  rest.get("http://localhost:3061/v1/video_production/pipelines/:pipelineId/nodes/:nodeId/status", (req, res, ctx) => {
-    return res(
-      ctx.status(200),
-      ctx.json({
-        id: req.params.nodeId,
-        status: "completed",
-        metadata: { completedAt: new Date().toISOString() },
-        output: { s3Key: "test-output.mp4" }
-      })
-    );
+  // Mock status endpoint
+  http.get("http://localhost:3061/admin/video_production/pipelines/:pipelineId/nodes/:nodeId/status", ({ params }) => {
+    return HttpResponse.json({
+      uuid: params.nodeId,
+      status: "completed",
+      metadata: {
+        completedAt: new Date().toISOString(),
+        cost: 0.05
+      },
+      output: {
+        s3Key: "test-output.mp4",
+        duration: 120,
+        size: 5242880
+      }
+    });
   })
 );
 
@@ -522,20 +529,20 @@ afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
 test("executes merge-videos node via API", async () => {
-  // Click play button
+  // Click execute button
   await page.click('[data-testid="execute-button"]');
 
-  // Verify API was called
+  // Verify status changes to in_progress
   await page.waitForSelector('[data-testid="status-in-progress"]');
 
-  // Wait for completion
-  await page.waitForSelector('[data-testid="status-completed"]');
+  // Wait for completion (poller will refresh)
+  await page.waitForSelector('[data-testid="status-completed"]', { timeout: 5000 });
 });
 ```
 
-### Update Unit Tests
+### Unit Tests
 
-Mock API client in Server Action tests:
+Mock the API client:
 
 ```typescript
 // app/pipelines/[id]/actions.test.ts
@@ -545,251 +552,12 @@ import * as apiClient from "@/lib/api-client";
 jest.mock("@/lib/api-client");
 
 test("executeNodeAction calls Rails API", async () => {
-  const mockExecute = jest.spyOn(apiClient, "executeNode").mockResolvedValue({ job_id: "test-123" });
+  const mockExecute = jest.spyOn(apiClient, "executeNode").mockResolvedValue({ status: "queued", job_id: "test-123" });
 
-  const result = await executeNodeAction("pipeline-1", "node-1");
+  const result = await executeNodeAction("pipeline-uuid", "node-uuid");
 
   expect(result.success).toBe(true);
-  expect(mockExecute).toHaveBeenCalledWith("pipeline-1", "node-1");
+  expect(result.jobId).toBe("test-123");
+  expect(mockExecute).toHaveBeenCalledWith("pipeline-uuid", "node-uuid");
 });
 ```
-
----
-
-## CORS Configuration
-
-Rails must allow Next.js to make API calls:
-
-```ruby
-# In Rails: config/initializers/cors.rb
-Rails.application.config.middleware.insert_before 0, Rack::Cors do
-  allow do
-    origins(
-      'http://localhost:3065',  # Next.js dev
-      'https://pipelines.jiki.io'  # Next.js production
-    )
-
-    resource '/v1/video_production/*',
-      headers: :any,
-      methods: [:get, :post, :put, :patch, :delete, :options, :head],
-      credentials: true
-  end
-end
-```
-
----
-
-## Deployment Coordination
-
-### Step-by-Step Deployment
-
-1. **Deploy Rails API** (Week 1)
-   - Migrate database schema (if renaming tables)
-   - Deploy models, controllers, serializers
-   - Test API endpoints with Postman
-
-2. **Deploy Next.js with Feature Flag** (Week 2)
-   - Add API client
-   - Add `USE_RAILS_API=false` (disabled)
-   - Deploy to production
-   - Verify no regressions
-
-3. **Enable Rails API for Subset** (Week 3)
-   - Enable `USE_RAILS_API=true` for 10% of requests
-   - Monitor logs, error rates
-   - Compare execution results
-
-4. **Full Cutover** (Week 4)
-   - Enable `USE_RAILS_API=true` for 100%
-   - Monitor for 1 week
-   - If stable, proceed to cleanup
-
-5. **Cleanup** (Week 5)
-   - Remove old execution code
-   - Remove feature flag
-   - Delete `pipeline/` directory
-   - Update documentation
-
----
-
-## Timeline
-
-| Phase                   | Duration | Tasks                                                   |
-| ----------------------- | -------- | ------------------------------------------------------- |
-| **Preparation**         | Week 1   | Rails API implementation (see VIDEO_PRODUCTION_PLAN.md) |
-| **Next.js Updates**     | Week 2   | Add API client, play button, status polling             |
-| **Testing**             | Week 2-3 | E2E tests, integration tests, manual QA                 |
-| **Parallel Deployment** | Week 3   | Deploy with feature flag, test subset                   |
-| **Full Cutover**        | Week 4   | Enable for all, monitor stability                       |
-| **Cleanup**             | Week 5   | Remove old code, update docs                            |
-
-**Total: 5 weeks**
-
----
-
-## Implementation Checklist
-
-### Preparation
-
-- [ ] Review Rails API plan (VIDEO_PRODUCTION_PLAN.md)
-- [ ] Set up shared database access for both apps
-- [ ] Configure CORS in Rails
-- [ ] Test database connection from both apps
-
-### Next.js Changes
-
-- [ ] Create `lib/api-client.ts` with `executeNode()` and `getNodeStatus()`
-- [ ] Add `executeNodeAction()` Server Action
-- [ ] Update `NodeHeader` component with play button
-- [ ] Wire up execution in all 8 node components
-- [ ] Add `StatusPoller` component for API polling
-- [ ] Add environment variable `RAILS_API_URL`
-- [ ] Add feature flag `USE_RAILS_API`
-
-### Testing
-
-- [ ] Write unit tests for API client
-- [ ] Update e2e tests to mock Rails API
-- [ ] Manual testing: Execute merge-videos node via API
-- [ ] Verify JSONB partial updates (no conflicts)
-- [ ] Test status polling updates UI correctly
-
-### Deployment
-
-- [ ] Deploy Rails API to staging
-- [ ] Deploy Next.js to staging with `USE_RAILS_API=false`
-- [ ] Enable `USE_RAILS_API=true` in staging
-- [ ] Test end-to-end flow in staging
-- [ ] Deploy to production with feature flag
-- [ ] Monitor production for 1 week
-
-### Cleanup
-
-- [ ] Remove `pipeline/` directory
-- [ ] Remove AWS SDK dependencies
-- [ ] Remove execution database operations
-- [ ] Remove feature flag code
-- [ ] Update documentation (README.md, PIPELINE-PLAN.md)
-- [ ] Update CLAUDE.md with new architecture
-
----
-
-## Monitoring During Migration
-
-### Metrics to Track
-
-1. **API Response Times**
-   - Rails API `/execute` endpoint latency
-   - Rails API `/status` endpoint latency
-
-2. **Error Rates**
-   - Failed executions (status = 'failed')
-   - API errors (4xx, 5xx responses)
-   - Database conflicts (check logs for race conditions)
-
-3. **Execution Success Rates**
-   - Compare old vs. new execution success %
-   - Monitor Lambda invocation errors
-   - Check S3 upload failures
-
-4. **Database Performance**
-   - Query times for JSONB updates
-   - Connection pool saturation
-   - Lock contention
-
-### Logging
-
-Add detailed logging:
-
-```typescript
-// lib/api-client.ts
-export async function executeNode(pipelineId: string, nodeId: string) {
-  console.log(`[API] Executing node ${nodeId} in pipeline ${pipelineId}`);
-
-  const startTime = Date.now();
-
-  try {
-    const result = await fetch(/* ... */);
-
-    const duration = Date.now() - startTime;
-    console.log(`[API] Execute succeeded in ${duration}ms`);
-
-    return result.json();
-  } catch (error) {
-    console.error(`[API] Execute failed:`, error);
-    throw error;
-  }
-}
-```
-
----
-
-## Risks & Mitigations
-
-| Risk                                 | Impact | Mitigation                                      |
-| ------------------------------------ | ------ | ----------------------------------------------- |
-| Database conflicts (race conditions) | High   | Use JSONB partial updates in both apps          |
-| Rails API downtime                   | High   | Feature flag allows rollback to local execution |
-| CORS misconfiguration                | Medium | Test in staging first, clear error messages     |
-| Authentication issues                | Medium | Start with no auth, add later                   |
-| Status polling performance           | Low    | Use efficient queries, add caching if needed    |
-
----
-
-## Success Criteria
-
-Migration is successful when:
-
-1. ✅ All node types execute via Rails API
-2. ✅ Status updates appear in UI within 2 seconds
-3. ✅ No database conflicts or race conditions
-4. ✅ Error rate < 1% (same as before migration)
-5. ✅ Execution time similar to local execution
-6. ✅ No manual intervention needed for failures
-7. ✅ Sidekiq jobs retry automatically on transient errors
-8. ✅ All tests passing (unit, integration, e2e)
-
----
-
-## Post-Migration Benefits
-
-After migration:
-
-- **Scalability**: Lambda handles heavy FFmpeg work
-- **Reliability**: Sidekiq retries, DLQ for failures
-- **Monitoring**: Sidekiq Web UI, Rails logs, CloudWatch
-- **Cost**: Pay per execution instead of always-on servers
-- **Separation**: UI (Next.js) vs. orchestration (Rails)
-- **Reusability**: Rails API can be called from other apps
-
----
-
-## Future Enhancements
-
-Once migration is stable:
-
-1. **Authentication**: Add JWT tokens for API security
-2. **Webhooks**: Rails pushes status updates instead of polling
-3. **WebSockets**: Real-time status via Action Cable
-4. **Batch Execution**: Execute entire pipeline with one API call
-5. **Cost Tracking**: Aggregate costs per pipeline
-6. **Retry UI**: Manual retry button for failed nodes
-
----
-
-## Related Documentation
-
-- **Rails API Plan**: `/Users/iHiD/Code/jiki/api/VIDEO_PRODUCTION_PLAN.md`
-- **Current Architecture**: `PIPELINE-PLAN.md` in this repo
-- **Database Schema**: `lib/db-migrations.ts`
-- **Node Types**: `lib/nodes/types.ts`
-
----
-
-**Next Steps:**
-
-1. Review both plan documents with team
-2. Start Rails API implementation (Week 1)
-3. Implement Next.js changes in parallel (Week 2)
-4. Test in staging environment (Week 3)
-5. Deploy to production with feature flag (Week 4)

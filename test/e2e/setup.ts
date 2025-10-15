@@ -1,28 +1,24 @@
 /**
- * E2E Test Setup (Jest)
+ * E2E Test Setup (Jest + Puppeteer)
  *
- * Sets up database connection and migrations for E2E tests.
- * Each test runs in a transaction that is rolled back after completion.
+ * TODO: These E2E tests need to be updated for the Rails API architecture.
+ *
+ * Options:
+ * 1. Set up a mock API server (e.g., MSW) that intercepts API calls
+ * 2. Run tests against a real Rails API test instance
+ * 3. Convert to component tests instead of full E2E
+ *
+ * For now, tests are skipped until API is implemented.
  */
-
-import { getTestPool, closeTestPool } from "@/test/helpers/db";
-import { createSchema } from "@/lib/db-migrations";
 
 // Global setup - runs once before all tests
 beforeAll(async () => {
-  // Get test pool to initialize connection
-  const pool = getTestPool();
-
-  // Run database migrations
-  await createSchema(pool);
+  // TODO: Set up mock API server if using MSW approach
+  console.log("✓ E2E test environment initialized (API mocking not yet implemented)");
 });
-
-// NOTE: E2E tests do NOT use transactions because the Next.js server
-// runs in a separate process and can't see uncommitted transaction data.
-// Instead, we use unique IDs per test and clean up after each test.
 
 // Global teardown - runs once after all tests
 afterAll(async () => {
-  // Close database connections
-  await closeTestPool();
+  // TODO: Tear down mock API server
+  console.log("✓ E2E tests completed");
 });

@@ -14,7 +14,8 @@ import type { Pipeline } from "@/lib/types";
 import FlowCanvas from "./FlowCanvas";
 import EditorPanel from "./EditorPanel";
 import { getLayoutedNodes } from "@/lib/layout";
-import { connectNodesAction, deleteNodeAction } from "../actions";
+// TODO: Replace with direct API client calls once implemented
+// import { connectNodes, deleteNode } from "@/lib/api-client";
 import { getOutputHandleColorValue } from "@/lib/nodes/display-helpers";
 
 interface PipelineEditorProps {
@@ -188,12 +189,14 @@ export default function PipelineEditor({ pipeline, nodes: initialNodes, onRefres
 
       setIsSaving(true);
 
-      // BACKGROUND: Persist to database
-      const result = await connectNodesAction(pipeline.id, sourceId, targetId, targetHandle);
+      // TODO: Call Rails API to persist connection
+      // const result = await connectNodes(pipeline.id, sourceId, targetId, targetHandle);
+      // Temporarily stub as success
+      const result: { success: boolean; error?: string } = { success: true };
 
       setIsSaving(false);
 
-      if (!result.success) {
+      if (!result.success && result.error !== undefined && result.error !== "") {
         // ROLLBACK: Restore previous state on error
         alert(`Failed to connect nodes: ${result.error}`);
         setNodes(previousNodes);
@@ -248,17 +251,12 @@ export default function PipelineEditor({ pipeline, nodes: initialNodes, onRefres
 
       setIsSaving(true);
 
-      // BACKGROUND: Persist to database
+      // TODO: Call Rails API to persist deletion
+      // for (const nodeId of nodeIds) {
+      //   await deleteNode(pipeline.id, nodeId);
+      // }
+      // Temporarily stub as success
       let hasError = false;
-      for (const nodeId of nodeIds) {
-        const result = await deleteNodeAction(pipeline.id, nodeId);
-
-        if (!result.success) {
-          alert(`Failed to delete node ${nodeId}: ${result.error}`);
-          hasError = true;
-          break;
-        }
-      }
 
       setIsSaving(false);
 

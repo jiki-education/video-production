@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { query } from "@/lib/db";
-import { nodesFromDB } from "@/lib/nodes/factory";
-import type { Pipeline, Node as DBNode } from "@/lib/types";
+import { getPipeline } from "@/lib/api-client";
+import type { Pipeline as APIPipeline } from "@/lib/api-client";
+import type { Pipeline } from "@/lib/types";
+import type { Node } from "@/lib/nodes/types";
 import PipelineLayout from "./components/PipelineLayout";
 
 interface PageProps {
@@ -11,25 +12,18 @@ interface PageProps {
 export default async function PipelinePage({ params }: PageProps) {
   const { id } = await params;
 
-  let pipeline: Pipeline | null = null;
-  let nodes: DBNode[] = [];
+  let pipeline: APIPipeline | null = null;
+  let nodes: Node[] = [];
   let error: string | null = null;
 
   try {
-    // Get pipeline from database
-    const pipelines = await query<Pipeline>("SELECT * FROM pipelines WHERE id = $1", [id]);
-
-    if (pipelines.length === 0) {
-      error = `Pipeline not found: ${id}`;
-    } else {
-      pipeline = pipelines[0];
-
-      // Get nodes for this pipeline
-      nodes = await query<DBNode>("SELECT * FROM nodes WHERE pipeline_id = $1", [id]);
-    }
+    // Get pipeline from Rails API
+    const data = await getPipeline(id);
+    pipeline = data.pipeline;
+    nodes = data.nodes as Node[];
   } catch (err) {
-    console.error("Error loading pipeline from database:", err);
-    error = err instanceof Error ? err.message : "Unknown database error";
+    console.error("Error loading pipeline from API:", err);
+    error = err instanceof Error ? err.message : "Unknown API error";
   }
 
   if (error !== null || pipeline === null) {
@@ -48,21 +42,17 @@ export default async function PipelinePage({ params }: PageProps) {
             <p className="text-red-800">
               <strong>Error:</strong> {error}
             </p>
-            <p className="text-sm text-red-600 mt-2">
-              Make sure the pipeline exists in the database. Run: <code className="bg-red-100 px-1">pnpm db:seed</code>
-            </p>
+            <p className="text-sm text-red-600 mt-2">This will work once the Rails API is implemented.</p>
           </div>
         </main>
       </div>
     );
   }
 
-  // Convert DB nodes to domain nodes for type safety
-  const domainNodes = nodesFromDB(nodes);
-
   return (
     <div className="h-screen flex flex-col">
-      <PipelineLayout pipelineId={id} pipeline={pipeline} nodes={domainNodes} />
+      {/* Cast pipeline to lib/types Pipeline (API returns strings, DB expects Dates) */}
+      <PipelineLayout pipelineId={id} pipeline={pipeline as unknown as Pipeline} nodes={nodes} />
     </div>
   );
 }
