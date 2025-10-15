@@ -5,7 +5,7 @@ import tsParser from "@typescript-eslint/parser";
 export default [
   // Ignore patterns
   {
-    ignores: ["node_modules/**", "dist/**", "build/**", "out/**", "public/**"]
+    ignores: ["node_modules/**", "dist/**", "build/**", "out/**", "public/**", ".next/**"]
   },
 
   // Base ESLint recommended config for all files
@@ -87,6 +87,34 @@ export default [
     files: ["scripts/**/*.{ts,js}"],
     rules: {
       "no-console": "off"
+    }
+  },
+
+  // Library files - allow console
+  {
+    files: ["src/lib/**/*.{ts,js}", "lib/**/*.{ts,js}"],
+    rules: {
+      "no-console": "off"
+    }
+  },
+
+  // Test files - allow console
+  {
+    files: ["test/**/*.{ts,js}"],
+    rules: {
+      "no-console": "off"
+    }
+  },
+
+  // Jest config files - allow Node.js globals
+  {
+    files: ["jest.config.js", "jest-puppeteer.config.js"],
+    languageOptions: {
+      globals: {
+        module: "readonly",
+        require: "readonly",
+        process: "readonly"
+      }
     }
   }
 ];

@@ -1,4 +1,16 @@
+/**
+ * Remotion Scene Types
+ *
+ * Types for code screen animations and scene configuration.
+ */
+
 export type TypingSpeed = "slow" | "normal" | "fast";
+
+export const CHARS_PER_SECOND: Record<TypingSpeed, number> = {
+  slow: 10,
+  normal: 15,
+  fast: 25
+};
 
 export interface TypeAction {
   type: "type";
@@ -9,21 +21,14 @@ export interface TypeAction {
 
 export interface PauseAction {
   type: "pause";
-  duration: number; // seconds
+  duration: number;
 }
 
 export type Action = TypeAction | PauseAction;
 
 export interface SceneConfig {
   title: string;
-  description?: string;
-  backgroundColor?: string;
   theme?: "dark" | "light";
+  backgroundColor?: string;
   actions: Action[];
 }
-
-export const CHARS_PER_SECOND: Record<TypingSpeed, number> = {
-  slow: 10, // 1 char every 3 frames at 30fps
-  normal: 15, // 1 char every 2 frames at 30fps
-  fast: 25 // 1 char every 1.2 frames at 30fps
-};
