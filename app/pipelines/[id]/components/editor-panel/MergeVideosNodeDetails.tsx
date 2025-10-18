@@ -29,7 +29,7 @@ export default function MergeVideosNodeDetails({
   allNodes,
   onRefresh
 }: MergeVideosNodeDetailsProps) {
-  const [segments, setSegments] = useState<string[]>(node.inputs.segments || []);
+  const [segments, setSegments] = useState<string[]>(node.inputs.segments);
   const [isReordering, setIsReordering] = useState(false);
 
   // Create a lookup map for node titles

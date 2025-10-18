@@ -2,19 +2,39 @@
  * Type-Safe Node Discriminated Unions
  *
  * These types represent the domain model for pipeline nodes.
- * Each node type has specific inputs and config schemas.
+ * Inputs and config types are auto-generated from Rails API schemas.
  *
- * Design: Using discriminated unions allows TypeScript to narrow types
- * based on the `type` field, giving us compile-time safety when working
- * with different node types.
+ * Source of truth: api/typescript/src/nodes.ts
+ *
+ * To update types:
+ * 1. cd ../api
+ * 2. bundle exec rake typescript:generate
+ * 3. cd ../code-videos
+ * 4. pnpm install
  */
 
 import type { NodeStatus, NodeMetadata, NodeOutput, AssetConfig } from "@/lib/types";
+
+// Import generated node types from API
+import type {
+  AssetNode as ApiAssetNode,
+  GenerateTalkingHeadNode as ApiGenerateTalkingHeadNode,
+  GenerateAnimationNode as ApiGenerateAnimationNode,
+  GenerateVoiceoverNode as ApiGenerateVoiceoverNode,
+  RenderCodeNode as ApiRenderCodeNode,
+  MixAudioNode as ApiMixAudioNode,
+  MergeVideosNode as ApiMergeVideosNode,
+  ComposeVideoNode as ApiComposeVideoNode
+} from "@jiki/api-types";
 
 // ============================================================================
 // Base Node Interface
 // ============================================================================
 
+/**
+ * Base properties that all nodes have in the frontend.
+ * The API types provide inputs/config, we add UI state.
+ */
 interface BaseNode {
   id: string;
   pipelineId: string;
@@ -28,104 +48,50 @@ interface BaseNode {
 // Specific Node Types
 // ============================================================================
 
-export interface AssetNode extends BaseNode {
-  type: "asset";
-  inputs: Record<string, never>; // Assets have no inputs
-  config: Record<string, unknown>;
-  asset: AssetConfig;
-}
+/**
+ * Asset Node - Static files (scripts, configs, images)
+ * Extends API type and adds frontend-specific asset config
+ */
+export type AssetNode = BaseNode &
+  ApiAssetNode & {
+    asset: AssetConfig;
+  };
 
-export interface TalkingHeadNode extends BaseNode {
-  type: "talking-head";
-  inputs: {
-    script?: string[]; // Reference to asset node with script
-  };
-  config: {
-    provider: string; // e.g., "heygen", "elevenlabs"
-    avatarId?: string;
-    voice?: string;
-    [key: string]: unknown; // Allow provider-specific config
-  };
-}
+/**
+ * Generate Talking Head Node - AI presenter videos (HeyGen)
+ * Note: Renamed from "talking-head" to "generate-talking-head" in API
+ */
+export type GenerateTalkingHeadNode = BaseNode & ApiGenerateTalkingHeadNode;
 
-export interface GenerateAnimationNode extends BaseNode {
-  type: "generate-animation";
-  inputs: {
-    prompt?: string[]; // Reference to asset node with prompt
-    referenceImage?: string[]; // Optional reference image
-  };
-  config: {
-    provider: string; // e.g., "veo3", "runway"
-    duration?: number;
-    aspectRatio?: string;
-    [key: string]: unknown;
-  };
-}
+/**
+ * Generate Animation Node - AI video generation (Veo 3, Runway, Stability)
+ */
+export type GenerateAnimationNode = BaseNode & ApiGenerateAnimationNode;
 
-export interface GenerateVoiceoverNode extends BaseNode {
-  type: "generate-voiceover";
-  inputs: {
-    script?: string[]; // Reference to asset node with script
-  };
-  config: {
-    provider: string; // e.g., "elevenlabs", "heygen"
-    voice?: string;
-    speed?: number;
-    [key: string]: unknown;
-  };
-}
+/**
+ * Generate Voiceover Node - Text-to-speech (ElevenLabs)
+ */
+export type GenerateVoiceoverNode = BaseNode & ApiGenerateVoiceoverNode;
 
-export interface RenderCodeNode extends BaseNode {
-  type: "render-code";
-  inputs: {
-    config?: string[]; // Reference to asset node with Remotion config JSON
-  };
-  config: {
-    provider: string; // e.g., "remotion"
-    compositionId?: string;
-    [key: string]: unknown;
-  };
-}
+/**
+ * Render Code Node - Code screen animations (Remotion)
+ */
+export type RenderCodeNode = BaseNode & ApiRenderCodeNode;
 
-export interface MixAudioNode extends BaseNode {
-  type: "mix-audio";
-  inputs: {
-    video?: string[]; // Reference to video node
-    audio?: string[]; // Reference to audio node
-  };
-  config: {
-    provider: string; // e.g., "ffmpeg"
-    mode?: "replace" | "overlay";
-    volume?: number;
-    [key: string]: unknown;
-  };
-}
+/**
+ * Mix Audio Node - Audio replacement/overlay (FFmpeg)
+ */
+export type MixAudioNode = BaseNode & ApiMixAudioNode;
 
-export interface MergeVideosNode extends BaseNode {
-  type: "merge-videos";
-  inputs: {
-    segments?: string[]; // Array of video node references
-  };
-  config: {
-    provider: string; // e.g., "ffmpeg"
-    transitions?: string;
-    [key: string]: unknown;
-  };
-}
+/**
+ * Merge Videos Node - Concatenate video segments (FFmpeg)
+ */
+export type MergeVideosNode = BaseNode & ApiMergeVideosNode;
 
-export interface ComposeVideoNode extends BaseNode {
-  type: "compose-video";
-  inputs: {
-    background?: string[]; // Background video
-    overlay?: string[]; // Overlay video (e.g., talking head)
-  };
-  config: {
-    provider: string; // e.g., "ffmpeg"
-    position?: string; // e.g., "bottom-right"
-    scale?: number;
-    [key: string]: unknown;
-  };
-}
+/**
+ * Compose Video Node - Picture-in-picture, overlays (FFmpeg)
+ */
+export type ComposeVideoNode = BaseNode & ApiComposeVideoNode;
 
 // ============================================================================
 // Discriminated Union
@@ -137,15 +103,15 @@ export interface ComposeVideoNode extends BaseNode {
  *
  * Example:
  *   function handleNode(node: Node) {
- *     if (node.type === 'talking-head') {
- *       // TypeScript knows node is TalkingHeadNode here
- *       console.log(node.config.provider);
+ *     if (node.type === 'generate-talking-head') {
+ *       // TypeScript knows node is GenerateTalkingHeadNode here
+ *       console.log(node.config);
  *     }
  *   }
  */
 export type Node =
   | AssetNode
-  | TalkingHeadNode
+  | GenerateTalkingHeadNode
   | GenerateAnimationNode
   | GenerateVoiceoverNode
   | RenderCodeNode
@@ -166,8 +132,8 @@ export function isAssetNode(node: Node): node is AssetNode {
   return node.type === "asset";
 }
 
-export function isTalkingHeadNode(node: Node): node is TalkingHeadNode {
-  return node.type === "talking-head";
+export function isGenerateTalkingHeadNode(node: Node): node is GenerateTalkingHeadNode {
+  return node.type === "generate-talking-head";
 }
 
 export function isGenerateAnimationNode(node: Node): node is GenerateAnimationNode {

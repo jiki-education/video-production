@@ -10,8 +10,25 @@ jobs:
   typecheck:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout code-videos
         uses: actions/checkout@v4
+        with:
+          path: code-videos
+
+      - name: Checkout API repo (main branch)
+        uses: actions/checkout@v4
+        with:
+          repository: jiki-education/jiki
+          ref: main
+          path: api
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: api
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -20,19 +37,44 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "pnpm"
+
+      - name: Generate TypeScript types from API schemas
+        run: |
+          cd api
+          bundle exec rake typescript:generate
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          cd code-videos
+          pnpm install --frozen-lockfile
 
       - name: Run typecheck
-        run: pnpm run typecheck
+        run: |
+          cd code-videos
+          pnpm run typecheck
 
   format:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout code-videos
         uses: actions/checkout@v4
+        with:
+          path: code-videos
+
+      - name: Checkout API repo (main branch)
+        uses: actions/checkout@v4
+        with:
+          repository: jiki-education/jiki
+          ref: main
+          path: api
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: api
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -41,19 +83,44 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "pnpm"
+
+      - name: Generate TypeScript types from API schemas
+        run: |
+          cd api
+          bundle exec rake typescript:generate
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          cd code-videos
+          pnpm install --frozen-lockfile
 
       - name: Check formatting
-        run: pnpm run format:check
+        run: |
+          cd code-videos
+          pnpm run format:check
 
   lint:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout code-videos
         uses: actions/checkout@v4
+        with:
+          path: code-videos
+
+      - name: Checkout API repo (main branch)
+        uses: actions/checkout@v4
+        with:
+          repository: jiki-education/jiki
+          ref: main
+          path: api
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: api
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -62,10 +129,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "pnpm"
+
+      - name: Generate TypeScript types from API schemas
+        run: |
+          cd api
+          bundle exec rake typescript:generate
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          cd code-videos
+          pnpm install --frozen-lockfile
 
       - name: Run ESLint
-        run: pnpm lint
+        run: |
+          cd code-videos
+          pnpm lint

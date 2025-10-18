@@ -29,7 +29,7 @@ import { getMaxConnections } from "@/lib/nodes/metadata";
 
 // Import custom node components
 import AssetNode from "./nodes/AssetNode";
-import TalkingHeadNode from "./nodes/TalkingHeadNode";
+import GenerateTalkingHeadNode from "./nodes/GenerateTalkingHeadNode";
 import RenderCodeNode from "./nodes/RenderCodeNode";
 import GenerateAnimationNode from "./nodes/GenerateAnimationNode";
 import GenerateVoiceoverNode from "./nodes/GenerateVoiceoverNode";
@@ -49,7 +49,7 @@ interface FlowCanvasProps {
 // Register custom node types
 const nodeTypes: NodeTypes = {
   asset: AssetNode,
-  "talking-head": TalkingHeadNode,
+  "generate-talking-head": GenerateTalkingHeadNode,
   "render-code": RenderCodeNode,
   "generate-animation": GenerateAnimationNode,
   "generate-voiceover": GenerateVoiceoverNode,

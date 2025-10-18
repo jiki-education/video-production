@@ -16,7 +16,7 @@ interface NodeHeaderProps {
 
 const NODE_ICONS: Record<NodeType, string> = {
   asset: "📄",
-  "talking-head": "👤",
+  "generate-talking-head": "👤",
   "render-code": "💻",
   "generate-animation": "🎬",
   "generate-voiceover": "🎙️",

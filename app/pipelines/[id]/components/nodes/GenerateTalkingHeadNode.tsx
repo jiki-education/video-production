@@ -1,10 +1,10 @@
 /**
- * Talking Head Node Component
+ * Generate Talking Head Node Component
  *
  * Displays human presenter video generation (HeyGen, etc.)
  */
 
-import type { TalkingHeadNode as TalkingHeadNodeType } from "@/lib/nodes/types";
+import type { GenerateTalkingHeadNode as GenerateTalkingHeadNodeType } from "@/lib/nodes/types";
 import { getNodeDisplayName } from "@/lib/nodes/display-helpers";
 import NodeHeader from "./shared/NodeHeader";
 import NodeOutputPreview from "./shared/NodeOutputPreview";
@@ -12,15 +12,15 @@ import NodeInputHandles from "./shared/NodeInputHandles";
 import NodeOutputHandle from "./shared/NodeOutputHandle";
 import { getNodeStatusStyle } from "./shared/getNodeStatusStyle";
 
-interface TalkingHeadNodeProps {
+interface GenerateTalkingHeadNodeProps {
   data: {
-    node: TalkingHeadNodeType;
+    node: GenerateTalkingHeadNodeType;
     onSelect: () => void;
   };
   selected: boolean;
 }
 
-export default function TalkingHeadNode({ data, selected }: TalkingHeadNodeProps) {
+export default function GenerateTalkingHeadNode({ data, selected }: GenerateTalkingHeadNodeProps) {
   const { node } = data;
   const statusStyle = getNodeStatusStyle(node.status);
   const displayName = getNodeDisplayName(node);
@@ -44,9 +44,9 @@ export default function TalkingHeadNode({ data, selected }: TalkingHeadNodeProps
 
       {/* Node Info */}
       <div className="px-4 py-3 text-xs text-gray-600 space-y-1">
-        {node.config.avatarId != null && node.config.avatarId !== "" && (
+        {node.provider === "heygen" && node.config.avatar_id != null && node.config.avatar_id !== "" && (
           <div>
-            <span className="font-semibold">Avatar:</span> {node.config.avatarId}
+            <span className="font-semibold">Avatar:</span> {node.config.avatar_id}
           </div>
         )}
         {node.metadata?.duration != null && (

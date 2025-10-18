@@ -40,9 +40,9 @@ export default function RenderCodeNode({ data, selected }: RenderCodeNodeProps) 
       <NodeOutputPreview node={node} />
 
       <div className="px-4 py-3 text-xs text-gray-600 space-y-1">
-        {node.config.compositionId != null && node.config.compositionId !== "" && (
+        {node.provider === "remotion" && node.config.composition != null && node.config.composition !== "" && (
           <div>
-            <span className="font-semibold">Composition:</span> {String(node.config.compositionId)}
+            <span className="font-semibold">Composition:</span> {String(node.config.composition)}
           </div>
         )}
         {node.metadata?.duration != null && (

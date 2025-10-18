@@ -50,7 +50,7 @@ export type NodeStatus = "pending" | "in_progress" | "completed" | "failed";
 
 export type NodeType =
   | "asset"
-  | "talking-head"
+  | "generate-talking-head"
   | "generate-animation"
   | "generate-voiceover"
   | "render-code"

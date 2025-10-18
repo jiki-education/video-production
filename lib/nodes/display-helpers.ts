@@ -29,7 +29,7 @@ export function getOutputDataType(node: Node): "video" | "image" | "audio" | "te
       }
       return "unknown";
 
-    case "talking-head":
+    case "generate-talking-head":
     case "generate-animation":
     case "render-code":
     case "merge-videos":
@@ -55,7 +55,7 @@ export function getInputDataType(
   // Map input keys to their expected data types
   const inputTypeMap: Record<NodeType, Record<string, "video" | "image" | "audio" | "text" | "json" | "generic">> = {
     asset: {},
-    "talking-head": {
+    "generate-talking-head": {
       script: "text"
     },
     "generate-animation": {
@@ -169,7 +169,7 @@ export function getInputHandleColor(nodeType: NodeType, inputKey: string): strin
 export function getNodeDisplayName(node: Node): string {
   const typeNames: Record<NodeType, string> = {
     asset: "Asset",
-    "talking-head": "Talking Head",
+    "generate-talking-head": "Talking Head",
     "generate-animation": "Animation Generation",
     "generate-voiceover": "Voiceover Generation",
     "render-code": "Code Screen",
@@ -179,9 +179,9 @@ export function getNodeDisplayName(node: Node): string {
   };
 
   const typeName = typeNames[node.type] ?? node.type;
-  const provider = node.config.provider;
+  const provider = node.provider;
 
-  if (provider != null && provider !== "") {
+  if (provider != null) {
     // Capitalize provider name
     const providerName = (provider as string).charAt(0).toUpperCase() + (provider as string).slice(1);
     return `${typeName} - ${providerName}`;

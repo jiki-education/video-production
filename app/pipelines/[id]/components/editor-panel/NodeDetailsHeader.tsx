@@ -15,7 +15,7 @@ interface NodeDetailsHeaderProps {
 
 const NODE_ICONS: Record<string, string> = {
   asset: "📄",
-  "talking-head": "👤",
+  "generate-talking-head": "👤",
   "render-code": "💻",
   "generate-animation": "🎬",
   "generate-voiceover": "🎙️",
