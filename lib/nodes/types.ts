@@ -36,8 +36,8 @@ import type {
  * The API types provide inputs/config, we add UI state.
  */
 interface BaseNode {
-  id: string;
-  pipelineId: string;
+  uuid: string;
+  pipeline_uuid: string;
   title: string; // Display title for the node
   status: NodeStatus;
   metadata: NodeMetadata | null;

@@ -8,10 +8,17 @@
  * - References are cleaned up in other nodes' inputs
  */
 
+import { setupApiMocks } from "./setup";
+
 describe("Node Deletion E2E", () => {
   let pipelineId: string;
   let nodeAId: string;
   let nodeBId: string;
+
+  // Set up API mocks once for entire test suite
+  beforeAll(async () => {
+    await setupApiMocks();
+  });
 
   beforeEach(async () => {
     // Generate unique ID for this test run
@@ -30,6 +37,9 @@ describe("Node Deletion E2E", () => {
 
     // Wait for React Flow to render
     await page.waitForSelector(".react-flow", { timeout: 10000 });
+
+    // Critical: Wait for React hydration to complete
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     // ========================================================================
     // BEFORE DELETION: Assert nodes and edges exist
@@ -89,10 +99,13 @@ describe("Node Deletion E2E", () => {
   it("should delete multiple connected nodes", async () => {
     // Navigate to the pipeline page
     await page.goto(`http://localhost:4000/pipelines/${pipelineId}`, {
-      waitUntil: "networkidle0"
+      waitUntil: "domcontentloaded"
     });
 
     await page.waitForSelector(".react-flow");
+
+    // Critical: Wait for React hydration to complete
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     // Get initial node count (mock returns 7 nodes)
     const initialNodes = await page.$$(".react-flow__node");

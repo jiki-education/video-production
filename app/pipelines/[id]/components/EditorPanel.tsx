@@ -15,19 +15,13 @@ import MergeVideosNodeDetails from "./editor-panel/MergeVideosNodeDetails";
 
 interface EditorPanelProps {
   selectedNode: Node | null;
-  pipelineId: string;
+  pipelineUuid: string;
   allNodes: Node[];
-  onDelete: (nodeId: string) => Promise<void>;
+  onDelete: (nodeUuid: string) => Promise<void>;
   onRefresh: () => void;
 }
 
-export default function EditorPanel({
-  selectedNode,
-  pipelineId: _pipelineId,
-  allNodes,
-  onDelete,
-  onRefresh
-}: EditorPanelProps) {
+export default function EditorPanel({ selectedNode, pipelineUuid, allNodes, onDelete, onRefresh }: EditorPanelProps) {
   const [isDeleting, startDeletion] = useTransition();
 
   if (!selectedNode) {
@@ -50,9 +44,9 @@ export default function EditorPanel({
   }
 
   const handleDelete = () => {
-    if (window.confirm(`Are you sure you want to delete node "${selectedNode.id}"?`)) {
+    if (window.confirm(`Are you sure you want to delete node "${selectedNode.uuid}"?`)) {
       startDeletion(async () => {
-        await onDelete(selectedNode.id);
+        await onDelete(selectedNode.uuid);
       });
     }
   };
@@ -68,7 +62,7 @@ export default function EditorPanel({
         {isMergeVideosNode(selectedNode) ? (
           <MergeVideosNodeDetails
             node={selectedNode}
-            pipelineId={_pipelineId}
+            pipelineUuid={pipelineUuid}
             allNodes={allNodes}
             onRefresh={onRefresh}
           />

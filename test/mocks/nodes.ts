@@ -30,8 +30,8 @@ import type {
  */
 export function createMockAssetNode(overrides?: Partial<AssetNode>): AssetNode {
   return {
-    id: "test-asset",
-    pipelineId: "test-pipeline",
+    uuid: "test-asset",
+    pipeline_uuid: "test-pipeline",
     type: "asset",
     title: "Test Asset",
     inputs: {},
@@ -55,8 +55,8 @@ export function createMockGenerateTalkingHeadNode(
   overrides?: Partial<GenerateTalkingHeadNode>
 ): GenerateTalkingHeadNode {
   return {
-    id: "test-generate-talking-head",
-    pipelineId: "test-pipeline",
+    uuid: "test-generate-talking-head",
+    pipeline_uuid: "test-pipeline",
     type: "generate-talking-head",
     title: "Test Talking Head",
     inputs: { script: "test-script" },
@@ -77,8 +77,8 @@ export function createMockGenerateTalkingHeadNode(
  */
 export function createMockRenderCodeNode(overrides?: Partial<RenderCodeNode>): RenderCodeNode {
   return {
-    id: "test-render-code",
-    pipelineId: "test-pipeline",
+    uuid: "test-render-code",
+    pipeline_uuid: "test-pipeline",
     type: "render-code",
     title: "Test Render Code",
     inputs: { config: "test-config" },
@@ -99,8 +99,8 @@ export function createMockRenderCodeNode(overrides?: Partial<RenderCodeNode>): R
  */
 export function createMockGenerateAnimationNode(overrides?: Partial<GenerateAnimationNode>): GenerateAnimationNode {
   return {
-    id: "test-animation",
-    pipelineId: "test-pipeline",
+    uuid: "test-animation",
+    pipeline_uuid: "test-pipeline",
     type: "generate-animation",
     title: "Test Animation",
     inputs: { prompt: "test-prompt" },
@@ -121,8 +121,8 @@ export function createMockGenerateAnimationNode(overrides?: Partial<GenerateAnim
  */
 export function createMockGenerateVoiceoverNode(overrides?: Partial<GenerateVoiceoverNode>): GenerateVoiceoverNode {
   return {
-    id: "test-voiceover",
-    pipelineId: "test-pipeline",
+    uuid: "test-voiceover",
+    pipeline_uuid: "test-pipeline",
     type: "generate-voiceover",
     title: "Test Voiceover",
     inputs: { script: "test-script" },
@@ -143,8 +143,8 @@ export function createMockGenerateVoiceoverNode(overrides?: Partial<GenerateVoic
  */
 export function createMockMixAudioNode(overrides?: Partial<MixAudioNode>): MixAudioNode {
   return {
-    id: "test-mix-audio",
-    pipelineId: "test-pipeline",
+    uuid: "test-mix-audio",
+    pipeline_uuid: "test-pipeline",
     type: "mix-audio",
     title: "Test Mix Audio",
     inputs: { video: "test-video", audio: "test-audio" },
@@ -165,8 +165,8 @@ export function createMockMixAudioNode(overrides?: Partial<MixAudioNode>): MixAu
  */
 export function createMockMergeVideosNode(overrides?: Partial<MergeVideosNode>): MergeVideosNode {
   return {
-    id: "test-merge-videos",
-    pipelineId: "test-pipeline",
+    uuid: "test-merge-videos",
+    pipeline_uuid: "test-pipeline",
     type: "merge-videos",
     title: "Test Merge Videos",
     inputs: { segments: ["video-1", "video-2"] },
@@ -187,8 +187,8 @@ export function createMockMergeVideosNode(overrides?: Partial<MergeVideosNode>):
  */
 export function createMockComposeVideoNode(overrides?: Partial<ComposeVideoNode>): ComposeVideoNode {
   return {
-    id: "test-compose-video",
-    pipelineId: "test-pipeline",
+    uuid: "test-compose-video",
+    pipeline_uuid: "test-pipeline",
     type: "compose-video",
     title: "Test Compose Video",
     inputs: { background: "bg-video", overlay: "overlay-video" },

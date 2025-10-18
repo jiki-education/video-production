@@ -11,7 +11,7 @@
 // ============================================================================
 
 export interface Pipeline {
-  id: string;
+  uuid: string;
   version: string;
   title: string;
   created_at: Date;
@@ -59,8 +59,8 @@ export type NodeType =
   | "compose-video";
 
 export interface Node {
-  id: string;
-  pipeline_id: string;
+  uuid: string;
+  pipeline_uuid: string;
   title: string; // Display title for the node
 
   // Structure (editable by UI)
@@ -119,7 +119,7 @@ export interface NodeOutput {
 
 // For createNode - only structure fields
 export interface CreateNodeInput {
-  id: string;
+  uuid: string;
   type: NodeType;
   title: string;
   inputs: NodeInputs;

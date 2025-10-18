@@ -10,7 +10,7 @@ interface PageProps {
 }
 
 export default async function PipelinePage({ params }: PageProps) {
-  const { id } = await params;
+  const { id: uuid } = await params;
 
   let pipeline: APIPipeline | null = null;
   let nodes: Node[] = [];
@@ -18,7 +18,7 @@ export default async function PipelinePage({ params }: PageProps) {
 
   try {
     // Get pipeline from Rails API
-    const data = await getPipeline(id);
+    const data = await getPipeline(uuid);
     pipeline = data.pipeline;
     nodes = data.nodes as Node[];
   } catch (err) {
@@ -33,7 +33,7 @@ export default async function PipelinePage({ params }: PageProps) {
           <Link href="/" className="text-white hover:text-gray-300">
             ← Back
           </Link>
-          <h1 className="flex-1 text-center font-semibold">Pipeline: {id}</h1>
+          <h1 className="flex-1 text-center font-semibold">Pipeline: {uuid}</h1>
           <div className="w-16"></div>
         </header>
 
@@ -52,7 +52,7 @@ export default async function PipelinePage({ params }: PageProps) {
   return (
     <div className="h-screen flex flex-col">
       {/* Cast pipeline to lib/types Pipeline (API returns strings, DB expects Dates) */}
-      <PipelineLayout pipelineId={id} pipeline={pipeline as unknown as Pipeline} nodes={nodes} />
+      <PipelineLayout pipelineUuid={uuid} pipeline={pipeline as unknown as Pipeline} nodes={nodes} />
     </div>
   );
 }

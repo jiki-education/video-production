@@ -20,7 +20,7 @@ import type { Pipeline } from "@/lib/types";
  */
 export function createMockPipeline(overrides?: Partial<Pipeline>): Pipeline {
   return {
-    id: "test-pipeline",
+    uuid: "test-pipeline",
     version: "1.0",
     title: "Test Pipeline",
     created_at: new Date(),

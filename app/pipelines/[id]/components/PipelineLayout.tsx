@@ -8,12 +8,12 @@ import PipelineHeader from "./PipelineHeader";
 import PipelineEditor from "./PipelineEditor";
 
 interface PipelineLayoutProps {
-  pipelineId: string;
+  pipelineUuid: string;
   pipeline: Pipeline;
   nodes: Node[];
 }
 
-export default function PipelineLayout({ pipelineId, pipeline, nodes }: PipelineLayoutProps) {
+export default function PipelineLayout({ pipelineUuid, pipeline, nodes }: PipelineLayoutProps) {
   const router = useRouter();
 
   const handleRefresh = useCallback(() => {
@@ -26,7 +26,7 @@ export default function PipelineLayout({ pipelineId, pipeline, nodes }: Pipeline
 
   return (
     <>
-      <PipelineHeader pipelineId={pipelineId} onRefresh={handleRefresh} onRelayout={handleRelayout} />
+      <PipelineHeader pipelineUuid={pipelineUuid} onRefresh={handleRefresh} onRelayout={handleRelayout} />
       <PipelineEditor pipeline={pipeline} nodes={nodes} onRefresh={handleRefresh} onRelayout={handleRelayout} />
     </>
   );

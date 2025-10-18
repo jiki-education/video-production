@@ -9,5 +9,8 @@ tsconfig.tsbuildinfo
 tmp/
 .claude/settings.local.json
 
+# Environment variables
+.env.local
+
 # TypeScript generated types (from API repo)
 node_modules/@jiki/api-types

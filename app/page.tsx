@@ -36,18 +36,17 @@ export default async function Home() {
           <div className="bg-white rounded-lg shadow">
             {pipelines.map((pipeline) => (
               <Link
-                key={pipeline.id}
-                href={`/pipelines/${pipeline.id}`}
+                key={pipeline.uuid}
+                href={`/pipelines/${pipeline.uuid}`}
                 className="block px-6 py-4 border-b border-gray-200 hover:bg-gray-50 transition-colors"
               >
                 <div className="flex justify-between items-start">
                   <div>
                     <h2 className="text-lg font-semibold text-gray-900">{pipeline.title}</h2>
-                    <p className="text-sm text-gray-500 mt-1">ID: {pipeline.id}</p>
+                    <p className="text-sm text-gray-500 mt-1">UUID: {pipeline.uuid}</p>
                   </div>
                   <div className="text-right text-sm text-gray-500">
-                    <div>Updated: {new Date(pipeline.updated_at).toLocaleDateString()}</div>
-                    <div className="text-xs mt-1">v{pipeline.version}</div>
+                    <div className="text-xs">v{pipeline.version}</div>
                   </div>
                 </div>
               </Link>

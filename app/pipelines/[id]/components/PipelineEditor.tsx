@@ -14,8 +14,7 @@ import type { Pipeline } from "@/lib/types";
 import FlowCanvas from "./FlowCanvas";
 import EditorPanel from "./EditorPanel";
 import { getLayoutedNodes } from "@/lib/layout";
-// TODO: Replace with direct API client calls once implemented
-// import { connectNodes, deleteNode } from "@/lib/api-client";
+import { connectNodes, deleteNode } from "@/lib/api-client";
 import { getOutputHandleColorValue } from "@/lib/nodes/display-helpers";
 
 interface PipelineEditorProps {
@@ -37,19 +36,19 @@ export default function PipelineEditor({ pipeline, nodes: initialNodes, onRefres
 
   // Find the selected node
   const selectedNode =
-    selectedNodeId != null && selectedNodeId !== "" ? (nodes.find((n) => n.id === selectedNodeId) ?? null) : null;
+    selectedNodeId != null && selectedNodeId !== "" ? (nodes.find((n) => n.uuid === selectedNodeId) ?? null) : null;
 
   // Convert domain nodes to React Flow nodes
   const reactFlowNodes: ReactFlowNode[] = useMemo(() => {
     return nodes.map((node) => ({
-      id: node.id,
+      id: node.uuid,
       type: node.type,
       position: { x: 0, y: 0 }, // Will be set by layout or preserved position
       data: {
         node,
-        onSelect: () => setSelectedNodeId(node.id)
+        onSelect: () => setSelectedNodeId(node.uuid)
       },
-      selected: node.id === selectedNodeId
+      selected: node.uuid === selectedNodeId
     }));
   }, [nodes, selectedNodeId]);
 
@@ -63,7 +62,7 @@ export default function PipelineEditor({ pipeline, nodes: initialNodes, onRefres
         if (Array.isArray(sources)) {
           sources.forEach((sourceId, index) => {
             // Find the source node to get its output color
-            const sourceNode = nodes.find((n) => n.id === sourceId);
+            const sourceNode = nodes.find((n) => n.uuid === sourceId);
             const edgeColor = sourceNode != null ? getOutputHandleColorValue(sourceNode) : "#9ca3af";
 
             // Determine if line should be dashed (pending/in_progress/failed) or solid (completed)
@@ -71,9 +70,9 @@ export default function PipelineEditor({ pipeline, nodes: initialNodes, onRefres
             const isDashed = sourceNode != null ? sourceNode.status !== "completed" : true;
 
             edgesList.push({
-              id: `${sourceId}-${node.id}-${inputKey}-${index}`,
+              id: `${sourceId}-${node.uuid}-${inputKey}-${index}`,
               source: sourceId,
-              target: node.id,
+              target: node.uuid,
               targetHandle: inputKey,
               animated: node.status === "in_progress",
               style: {
@@ -162,7 +161,7 @@ export default function PipelineEditor({ pipeline, nodes: initialNodes, onRefres
 
       setNodes((prevNodes) => {
         return prevNodes.map((node) => {
-          if (node.id === targetId) {
+          if (node.uuid === targetId) {
             // Get current array (or empty array if doesn't exist)
             const currentValue = (node.inputs as Record<string, string[]>)[targetHandle] ?? [];
 
@@ -189,20 +188,19 @@ export default function PipelineEditor({ pipeline, nodes: initialNodes, onRefres
 
       setIsSaving(true);
 
-      // TODO: Call Rails API to persist connection
-      // const result = await connectNodes(pipeline.id, sourceId, targetId, targetHandle);
-      // Temporarily stub as success
-      const result: { success: boolean; error?: string } = { success: true };
-
-      setIsSaving(false);
-
-      if (!result.success && result.error !== undefined && result.error !== "") {
+      // Call Rails API to persist connection
+      try {
+        await connectNodes(pipeline.uuid, sourceId, targetId, targetHandle);
+      } catch (error) {
         // ROLLBACK: Restore previous state on error
-        alert(`Failed to connect nodes: ${result.error}`);
+        const errorMessage = error instanceof Error ? error.message : "Failed to connect nodes";
+        alert(`Failed to connect nodes: ${errorMessage}`);
         setNodes(previousNodes);
+      } finally {
+        setIsSaving(false);
       }
     },
-    [pipeline.id, nodes]
+    [pipeline.uuid, nodes]
   );
 
   // Handle deleting nodes with optimistic update
@@ -214,7 +212,7 @@ export default function PipelineEditor({ pipeline, nodes: initialNodes, onRefres
 
       setNodes((prevNodes) => {
         // Remove deleted nodes
-        let updated = prevNodes.filter((node) => !nodeIds.includes(node.id));
+        let updated = prevNodes.filter((node) => !nodeIds.includes(node.uuid));
 
         // Clean up references in remaining nodes' inputs
         updated = updated.map((node) => {
@@ -223,7 +221,7 @@ export default function PipelineEditor({ pipeline, nodes: initialNodes, onRefres
 
           Object.entries(cleanedInputs).forEach(([key, value]) => {
             if (Array.isArray(value)) {
-              const filtered = value.filter((id) => !nodeIds.includes(id));
+              const filtered = value.filter((uuid) => !nodeIds.includes(uuid));
               if (filtered.length !== value.length) {
                 cleanedInputs[key] = filtered;
                 modified = true;
@@ -240,7 +238,7 @@ export default function PipelineEditor({ pipeline, nodes: initialNodes, onRefres
       // Remove positions for deleted nodes
       setNodePositions((prev) => {
         const updated = { ...prev };
-        nodeIds.forEach((id) => delete updated[id]);
+        nodeIds.forEach((uuid) => delete updated[uuid]);
         return updated;
       });
 
@@ -251,25 +249,25 @@ export default function PipelineEditor({ pipeline, nodes: initialNodes, onRefres
 
       setIsSaving(true);
 
-      // TODO: Call Rails API to persist deletion
-      // for (const nodeId of nodeIds) {
-      //   await deleteNode(pipeline.id, nodeId);
-      // }
-      // Temporarily stub as success
-      let hasError = false;
-
-      setIsSaving(false);
-
-      if (hasError) {
+      // Call Rails API to persist deletion
+      try {
+        for (const nodeUuid of nodeIds) {
+          await deleteNode(pipeline.uuid, nodeUuid);
+        }
+      } catch (error) {
         // ROLLBACK: Restore previous state on error
+        const errorMessage = error instanceof Error ? error.message : "Failed to delete node";
+        alert(`Failed to delete node: ${errorMessage}`);
         setNodes(previousNodes);
         setNodePositions(previousPositions);
         if (selectedNodeId != null && selectedNodeId !== "" && nodeIds.includes(selectedNodeId)) {
           setSelectedNodeId(selectedNodeId); // Restore selection
         }
+      } finally {
+        setIsSaving(false);
       }
     },
-    [pipeline.id, nodes, nodePositions, selectedNodeId]
+    [pipeline.uuid, nodes, nodePositions, selectedNodeId]
   );
 
   // Handle delete from editor panel
@@ -307,7 +305,7 @@ export default function PipelineEditor({ pipeline, nodes: initialNodes, onRefres
       {/* Editor Panel */}
       <EditorPanel
         selectedNode={selectedNode}
-        pipelineId={pipeline.id}
+        pipelineUuid={pipeline.uuid}
         allNodes={nodes}
         onDelete={handleDeleteFromPanel}
         onRefresh={onRefresh}

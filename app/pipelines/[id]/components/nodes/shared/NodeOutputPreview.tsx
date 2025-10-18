@@ -32,9 +32,9 @@ export default function NodeOutputPreview({ node }: NodeOutputPreviewProps) {
   const isCompleted = node.status === "completed";
 
   // For videos/audio, construct API URL
-  const pipelineId = node.pipelineId;
+  const pipelineUuid = node.pipeline_uuid;
   const apiVideoUrl =
-    isCompleted && (dataType === "video" || dataType === "audio") ? `/api/videos/${pipelineId}/${node.id}` : null;
+    isCompleted && (dataType === "video" || dataType === "audio") ? `/api/videos/${pipelineUuid}/${node.uuid}` : null;
 
   if (!hasPreview) {
     return (
