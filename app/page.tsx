@@ -1,15 +1,14 @@
 import Link from "next/link";
-import { query } from "@/lib/db";
-import type { Pipeline } from "@/lib/types";
+import { listPipelines, type Pipeline } from "@/lib/api-client";
 
 export default async function Home() {
   let pipelines: Pipeline[] = [];
   let error: string | null = null;
 
   try {
-    pipelines = await query<Pipeline>("SELECT * FROM pipelines ORDER BY updated_at DESC");
+    pipelines = await listPipelines();
   } catch (err) {
-    console.error("Error loading pipelines from database:", err);
+    console.error("Error loading pipelines from API:", err);
     error = err instanceof Error ? err.message : "Unknown error";
   }
 
@@ -22,37 +21,32 @@ export default async function Home() {
         {error !== null ? (
           <div className="bg-red-50 border border-red-400 rounded-lg p-4">
             <p className="text-red-800">
-              <strong>Database Error:</strong> {error}
+              <strong>API Error:</strong> {error}
             </p>
-            <p className="text-sm text-red-600 mt-2">
-              Make sure PostgreSQL is running and run: <code className="bg-red-100 px-1">pnpm db:init</code>
-            </p>
+            <p className="text-sm text-red-600 mt-2">This will work once the Rails API is implemented.</p>
           </div>
         ) : pipelines.length === 0 ? (
           <div className="bg-yellow-50 border border-yellow-400 rounded-lg p-4">
             <p className="text-yellow-800">
               <strong>No pipelines found.</strong>
             </p>
-            <p className="text-sm text-yellow-700 mt-2">
-              Create a pipeline or run: <code className="bg-yellow-100 px-1">pnpm db:seed</code>
-            </p>
+            <p className="text-sm text-yellow-700 mt-2">This will work once the Rails API is implemented.</p>
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow">
             {pipelines.map((pipeline) => (
               <Link
-                key={pipeline.id}
-                href={`/pipelines/${pipeline.id}`}
+                key={pipeline.uuid}
+                href={`/pipelines/${pipeline.uuid}`}
                 className="block px-6 py-4 border-b border-gray-200 hover:bg-gray-50 transition-colors"
               >
                 <div className="flex justify-between items-start">
                   <div>
                     <h2 className="text-lg font-semibold text-gray-900">{pipeline.title}</h2>
-                    <p className="text-sm text-gray-500 mt-1">ID: {pipeline.id}</p>
+                    <p className="text-sm text-gray-500 mt-1">UUID: {pipeline.uuid}</p>
                   </div>
                   <div className="text-right text-sm text-gray-500">
-                    <div>Updated: {new Date(pipeline.updated_at).toLocaleDateString()}</div>
-                    <div className="text-xs mt-1">v{pipeline.version}</div>
+                    <div className="text-xs">v{pipeline.version}</div>
                   </div>
                 </div>
               </Link>

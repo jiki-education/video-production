@@ -2,15 +2,15 @@
 
 ## Overview
 
-This repository is a **complete video production pipeline system** for generating Jiki's educational programming videos. It orchestrates multiple AI services and video generation tools to produce approximately **50 lessons** (with potential for multiple languages later), each 10-15 minutes long.
+This repository is the **frontend visual editor** for Jiki's video production pipeline system. It provides a React Flow-based graph editor for designing video generation workflows and displays execution status from the Rails API backend.
 
 The system has two main parts:
 
-1. **Visual Pipeline Editor** (Next.js + React Flow + PostgreSQL)
+1. **Visual Pipeline Editor** (Next.js + React Flow)
    - Graph-based pipeline designer for orchestrating video generation
    - Supports multiple node types: talking heads (HeyGen), animations (Veo 3), code screens (Remotion), audio mixing, video merging
-   - Real-time execution monitoring with status updates
-   - PostgreSQL database with JSONB for flexible configuration storage
+   - Real-time execution monitoring via Rails API polling
+   - Reads pipeline data from Rails API
 
 2. **Code Screen Generator** (Remotion)
    - Animated code typing with syntax highlighting and keypress sounds
@@ -19,21 +19,20 @@ The system has two main parts:
 
 ## Repository Purpose
 
-This single repository handles the **entire video production workflow** from configuration to final render:
+This frontend application provides the **visual interface** for the video production workflow:
 
 - **Design pipelines** visually with drag-and-drop nodes
-- **Execute nodes** via integrated AI services (HeyGen, Veo 3, ElevenLabs, Remotion)
-- **Monitor progress** with real-time status updates
-- **Generate 50+ educational videos** at scale with consistent quality
+- **View execution status** from Rails API backend
+- **Monitor progress** with real-time API polling
+- **Generate code screen videos** using Remotion
 
 ## Tech Stack
 
 ### Pipeline Editor
 
-- **Next.js 15** with App Router and Turbopack - Server-side rendering and Server Actions
+- **Next.js 15** with App Router and Turbopack - Server-side rendering
 - **React Flow 11+** - Visual graph editor for pipeline design
-- **PostgreSQL** with **JSONB** - Database with native JSON support for flexible schemas
-- **pg** - PostgreSQL client with connection pooling
+- **Rails API Client** - Fetches pipeline data and execution status from backend
 - **Tailwind CSS 4** - Styling
 
 ### Code Screen Generator
@@ -51,43 +50,29 @@ This single repository handles the **entire video production workflow** from con
 
 ```
 code-videos/
-├── PIPELINE-PLAN.md           # Complete pipeline system architecture
-├── CLAUDE.md                  # This document (agent guidance)
+├── CLAUDE.md -> AGENTS.md     # Symlink to agent documentation
+├── AGENTS.md                  # Agent guidance (this file)
 ├── README.md                  # User-facing documentation
+├── PLAN.md                    # Future enhancements
 │
 ├── app/                       # Next.js visual pipeline editor
 │   ├── page.tsx               # Index: list all pipelines
 │   └── pipelines/[id]/
 │       ├── page.tsx           # Pipeline editor (Server Component)
-│       ├── actions.ts         # Server Actions for DB updates
 │       └── components/        # React Flow UI components
 │
-├── lib/                       # Database and utilities
-│   ├── db.ts                  # PostgreSQL connection pool
-│   ├── db-operations.ts       # Atomic DB operations (JSONB partial updates)
-│   ├── db-migrations.ts       # Schema creation
-│   ├── types.ts               # Database type definitions
+├── lib/                       # API client and utilities
+│   ├── api-client.ts          # Rails API client
+│   ├── types.ts               # Type definitions
 │   └── nodes/
-│       ├── types.ts           # Type-safe node discriminated unions
-│       └── factory.ts         # DB ↔ Node conversion functions
+│       └── types.ts           # Type-safe node discriminated unions
 │
 ├── test/                      # Test infrastructure
-│   ├── setup.ts               # Global test setup with transaction support
-│   ├── helpers/
-│   │   └── db.ts              # Test database helpers
-│   ├── factories/             # FactoryBot-style database factories
-│   │   ├── pipelines.ts       # Pipeline factories
-│   │   └── nodes.ts           # Node factories (all 8 types)
-│   ├── mocks/                 # In-memory mock factories
-│   │   ├── pipelines.ts       # Mock pipelines
-│   │   └── nodes.ts           # Mock nodes
-│   └── lib/
-│       └── nodes/
-│           └── factory.test.ts # Node factory tests
-│
-├── pipeline/                  # Execution engine (future)
-│   ├── scripts/               # CLI executors
-│   └── lib/                   # Node executors, provider integrations
+│   ├── setup.ts               # Global test setup
+│   ├── e2e/                   # End-to-end tests (Jest + Puppeteer)
+│   └── mocks/                 # In-memory mock factories
+│       ├── pipelines.ts       # Mock pipelines
+│       └── nodes.ts           # Mock nodes
 │
 ├── src/                       # Remotion code screen generator
 │   ├── components/
@@ -101,11 +86,9 @@ code-videos/
 │   └── assets/sounds/
 │
 ├── scenes/                    # Remotion JSON configurations
-├── scripts/                   # Rendering and DB scripts
+├── scripts/                   # Rendering scripts
 │   ├── render.ts              # Render code screens
-│   ├── db-init.ts             # Initialize database
-│   ├── db-seed.ts             # Seed pipelines from JSON
-│   └── setup-test-db.sh       # Test database setup script
+│   └── renderAll.ts           # Render all scenes
 │
 └── lessons/                   # Lesson assets and pipeline configs
     └── lesson-001/
@@ -131,40 +114,12 @@ The pipeline editor allows designing video generation workflows as graphs with n
 - `merge-videos` - Concatenate video segments (FFmpeg)
 - `compose-video` - Picture-in-picture, overlays (FFmpeg)
 
-**Database Architecture:**
+**Architecture:**
 
-- PostgreSQL with JSONB columns for flexible configuration
-- Server Components read directly from database (no API layer)
-- Server Actions handle mutations via atomic operations
-- Real-time updates via `router.refresh()` polling
-
-**CRITICAL: JSONB Partial Updates**
-
-**ALL database updates MUST use `jsonb_set()` to update only changed keys. Never replace entire JSONB columns.**
-
-```sql
--- ✅ CORRECT: Update single key
-UPDATE nodes
-SET config = jsonb_set(config, '{provider}', '"heygen"')
-WHERE pipeline_id = $1 AND id = $2;
-
--- ✅ CORRECT: Update multiple keys (chain jsonb_set)
-UPDATE nodes
-SET metadata = jsonb_set(
-  jsonb_set(metadata, '{startedAt}', to_jsonb(NOW())),
-  '{jobId}', to_jsonb($3::text)
-)
-WHERE pipeline_id = $1 AND id = $2;
-
--- ❌ WRONG: Replaces entire object, loses other keys
-UPDATE nodes
-SET config = '{"provider": "heygen"}'::jsonb
-WHERE pipeline_id = $1 AND id = $2;
-```
-
-**Why:** Multiple processes update different keys concurrently (UI updates `config`, Executor updates `metadata`). Partial updates prevent data loss.
-
-**Reference:** See PIPELINE-PLAN.md "JSONB Partial Update Strategy" section for complete patterns and examples.
+- Rails API backend handles all data storage and execution
+- Next.js frontend fetches pipeline data from API
+- Real-time status updates via API polling
+- No direct database access from frontend
 
 ---
 
@@ -369,82 +324,13 @@ pnpm render:all
 
 ### Test Framework
 
-- **Vitest** - Fast, modern test runner with TypeScript support
-- **pg-transactional-tests** - Automatic transaction rollback (Rails-style testing)
-- Test files located in `test/` directory
-
-### Writing Tests
-
-All database tests automatically run in isolated transactions that rollback after completion:
-
-```typescript
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { testTransaction, query, createTestPipeline } from "@/test/helpers/db";
-
-// Wrap each test in a transaction
-beforeEach(testTransaction.start);
-afterEach(testTransaction.rollback);
-
-describe("My Feature", () => {
-  it("creates a node", async () => {
-    // Create test pipeline (required for foreign keys)
-    await createTestPipeline();
-
-    // Insert test data
-    await query("INSERT INTO nodes (id, pipeline_id, type, inputs, config, status) VALUES ($1, $2, $3, $4, $5, $6)", [
-      "test-node",
-      "test-pipeline",
-      "asset",
-      {},
-      {},
-      "pending"
-    ]);
-
-    // Run assertions
-    const [node] = await query("SELECT * FROM nodes WHERE id = $1", ["test-node"]);
-    expect(node.status).toBe("pending");
-
-    // Automatic rollback - no cleanup needed!
-  });
-});
-```
-
-### Database Factories (FactoryBot Pattern)
-
-Use database factories from `@/test/factories` for creating actual DB records with sensible defaults:
-
-```typescript
-import { createPipeline, createTalkingHeadNode } from "@/test/factories";
-
-// Auto-creates pipeline if not provided
-const node = await createTalkingHeadNode({
-  id: "my-test-node",
-  config: { provider: "heygen", avatarId: "avatar-1" }
-});
-
-// Or create pipeline explicitly
-const pipeline = await createPipeline({ id: "my-pipeline" });
-const node2 = await createTalkingHeadNode({
-  pipelineId: pipeline.id,
-  config: { provider: "heygen" }
-});
-```
-
-Available factories:
-
-- `createPipeline()` / `buildPipeline()` - Pipeline records
-- `createAssetNode()` - Asset nodes
-- `createTalkingHeadNode()` - Talking head nodes
-- `createRenderCodeNode()` - Render code nodes
-- `createGenerateAnimationNode()` - Animation nodes
-- `createGenerateVoiceoverNode()` - Voiceover nodes
-- `createMixAudioNode()` - Mix audio nodes
-- `createMergeVideosNode()` - Merge videos nodes
-- `createComposeVideoNode()` - Compose video nodes
+- **Jest** - Test framework for E2E tests
+- **Puppeteer** - Headless browser automation
+- Test files located in `test/e2e/` directory
 
 ### Mock Factories (In-Memory)
 
-Use mock factories from `@/test/mocks` for testing serialization without database:
+Use mock factories from `@/test/mocks` for testing with mock data:
 
 ```typescript
 import { createMockTalkingHeadNode, createMockPipeline } from "@/test/mocks";
@@ -455,39 +341,75 @@ const node = createMockTalkingHeadNode({
 });
 ```
 
+Available factories:
+
+- `createMockPipeline()` - Pipeline records
+- `createMockAssetNode()` - Asset nodes
+- `createMockTalkingHeadNode()` - Talking head nodes
+- `createMockRenderCodeNode()` - Render code nodes
+- `createMockGenerateAnimationNode()` - Animation nodes
+- `createMockGenerateVoiceoverNode()` - Voiceover nodes
+- `createMockMixAudioNode()` - Mix audio nodes
+- `createMockMergeVideosNode()` - Merge videos nodes
+- `createMockComposeVideoNode()` - Compose video nodes
+
 ### Running Tests
 
 ```bash
-# Set up test database (first time only)
-pnpm test:setup
+# Run E2E tests (Jest + Puppeteer)
+pnpm test:e2e
 
-# Run tests in watch mode
-pnpm test
+# Run with visible browser (debugging)
+pnpm test:e2e:headful
 
-# Run once and exit
-pnpm test:run
-
-# Run with UI
-pnpm test:ui
-
-# Run with coverage
-pnpm test:coverage
+# Watch mode
+pnpm test:e2e:watch
 ```
 
-### Test Database
+### E2E Testing Best Practices
 
-- **Separate database**: `jiki_video_pipelines_test`
-- **Automatic schema creation** via `test/setup.ts`
-- **Transaction isolation**: Each test runs in its own transaction
-- **Parallel execution**: Tests run in parallel via Vitest's fork pool
+**IMPORTANT Wait Strategy:**
+
+- **DO NOT use `waitUntil: "networkidle0"`** - It's 30% slower and unnecessary
+- **USE `waitUntil: "domcontentloaded"`** instead for faster tests
+- **ALWAYS add a 500ms delay after page load** to ensure React hydration completes before interacting with the page
+
+**Pattern:**
+
+```typescript
+// ✅ CORRECT: Fast and reliable
+await page.goto(`http://localhost:4000/pipelines/${id}`, {
+  waitUntil: "domcontentloaded" // Fast - DOM is ready
+});
+
+await page.waitForSelector(".react-flow", { timeout: 2000 });
+await page.waitForSelector(`[data-id="${nodeId}"]`, { timeout: 2000 });
+
+// Critical: Wait for React hydration to attach event handlers
+await new Promise((resolve) => setTimeout(resolve, 500));
+
+// Now safe to interact
+await page.click(`[data-id="${nodeId}"]`);
+
+// ❌ WRONG: Slow and unnecessary
+await page.goto(`http://localhost:4000/pipelines/${id}`, {
+  waitUntil: "networkidle0" // Waits for all network requests to settle
+});
+// No hydration delay - clicks may not work!
+await page.click(`[data-id="${nodeId}"]`);
+```
+
+**Why the 500ms delay?**
+
+- Next.js uses React hydration - the HTML renders first, then React attaches event handlers
+- Without the delay, elements exist in the DOM but clicks don't work yet
+- 500ms is the minimum reliable delay for React hydration to complete
 
 ### Key Testing Principles
 
-1. **Use database factories from `@/test/factories`** for creating DB records - they auto-create dependencies
-2. **Use mock factories from `@/test/mocks`** for in-memory testing without DB
-3. **Never manually rollback** - `testTransaction` handles it automatically
-4. **Tests are fast** - Transaction rollback is instant (~0.1ms)
-5. **No test pollution** - Each test starts with a clean database state
+1. **Use mock factories from `@/test/mocks`** for in-memory testing
+2. **Mock the Rails API** for E2E tests using test setup
+3. **Tests are isolated** - Each test uses fresh mock data
 
 ## Future Enhancements
 

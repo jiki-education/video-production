@@ -40,12 +40,12 @@ export default function ComposeVideoNode({ data, selected }: ComposeVideoNodePro
       <NodeOutputPreview node={node} />
 
       <div className="px-4 py-3 text-xs text-gray-600 space-y-1">
-        {node.config.position != null && node.config.position !== "" && (
+        {node.provider === "ffmpeg" && node.config.position != null && (
           <div>
             <span className="font-semibold">Position:</span> {String(node.config.position)}
           </div>
         )}
-        {node.config.scale != null && node.config.scale !== 0 && (
+        {node.provider === "ffmpeg" && node.config.scale != null && (
           <div>
             <span className="font-semibold">Scale:</span> {String(node.config.scale)}
           </div>

@@ -18,7 +18,8 @@ import {
   type OnConnect,
   type OnNodesDelete,
   type NodeTypes,
-  type IsValidConnection
+  type IsValidConnection,
+  type NodeMouseHandler
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -28,7 +29,7 @@ import { getMaxConnections } from "@/lib/nodes/metadata";
 
 // Import custom node components
 import AssetNode from "./nodes/AssetNode";
-import TalkingHeadNode from "./nodes/TalkingHeadNode";
+import GenerateTalkingHeadNode from "./nodes/GenerateTalkingHeadNode";
 import RenderCodeNode from "./nodes/RenderCodeNode";
 import GenerateAnimationNode from "./nodes/GenerateAnimationNode";
 import GenerateVoiceoverNode from "./nodes/GenerateVoiceoverNode";
@@ -48,7 +49,7 @@ interface FlowCanvasProps {
 // Register custom node types
 const nodeTypes: NodeTypes = {
   asset: AssetNode,
-  "talking-head": TalkingHeadNode,
+  "generate-talking-head": GenerateTalkingHeadNode,
   "render-code": RenderCodeNode,
   "generate-animation": GenerateAnimationNode,
   "generate-voiceover": GenerateVoiceoverNode,
@@ -119,6 +120,14 @@ export default function FlowCanvas({
     [onNodesDelete]
   );
 
+  // Handle node click (select)
+  const handleNodeClick: NodeMouseHandler = useCallback(
+    (_event, node) => {
+      onNodeSelect(node.id);
+    },
+    [onNodeSelect]
+  );
+
   // Handle canvas click (deselect)
   const handlePaneClick = useCallback(() => {
     onNodeSelect(null);
@@ -132,6 +141,7 @@ export default function FlowCanvas({
         nodeTypes={nodeTypes}
         onConnect={handleConnect}
         onNodesDelete={handleNodesDelete}
+        onNodeClick={handleNodeClick}
         onPaneClick={handlePaneClick}
         isValidConnection={isValidConnection}
         fitView

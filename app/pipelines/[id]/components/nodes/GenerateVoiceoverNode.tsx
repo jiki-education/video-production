@@ -40,14 +40,19 @@ export default function GenerateVoiceoverNode({ data, selected }: GenerateVoiceo
       <NodeOutputPreview node={node} />
 
       <div className="px-4 py-3 text-xs text-gray-600 space-y-1">
-        {node.config.voice != null && node.config.voice !== "" && (
+        {node.provider === "elevenlabs" && node.config.voice_id != null && node.config.voice_id !== "" && (
           <div>
-            <span className="font-semibold">Voice:</span> {String(node.config.voice)}
+            <span className="font-semibold">Voice:</span> {String(node.config.voice_id)}
           </div>
         )}
-        {node.config.speed != null && node.config.speed !== 0 && (
+        {node.provider === "elevenlabs" && node.config.model != null && (
           <div>
-            <span className="font-semibold">Speed:</span> {String(node.config.speed)}x
+            <span className="font-semibold">Model:</span> {String(node.config.model)}
+          </div>
+        )}
+        {node.metadata?.duration != null && (
+          <div>
+            <span className="font-semibold">Duration:</span> {String(node.metadata.duration)}s
           </div>
         )}
       </div>

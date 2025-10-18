@@ -1,9 +1,9 @@
 /**
  * Database Types for Jiki Pipeline System
  *
- * These types represent the SQLite schema for pipeline orchestration.
+ * These types represent the PostgreSQL schema for pipeline orchestration.
  * Structure fields (type, inputs, config) are edited by the UI.
- * State fields (status, metadata, output) are edited by the Executor.
+ * State fields (status, metadata, output) are managed by the Rails API.
  */
 
 // ============================================================================
@@ -11,7 +11,7 @@
 // ============================================================================
 
 export interface Pipeline {
-  id: string;
+  uuid: string;
   version: string;
   title: string;
   created_at: Date;
@@ -50,7 +50,7 @@ export type NodeStatus = "pending" | "in_progress" | "completed" | "failed";
 
 export type NodeType =
   | "asset"
-  | "talking-head"
+  | "generate-talking-head"
   | "generate-animation"
   | "generate-voiceover"
   | "render-code"
@@ -59,8 +59,8 @@ export type NodeType =
   | "compose-video";
 
 export interface Node {
-  id: string;
-  pipeline_id: string;
+  uuid: string;
+  pipeline_uuid: string;
   title: string; // Display title for the node
 
   // Structure (editable by UI)
@@ -69,7 +69,7 @@ export interface Node {
   config: NodeConfig;
   asset?: AssetConfig;
 
-  // Execution state (editable by Executor only)
+  // Execution state (managed by Rails API)
   status: NodeStatus;
   metadata: NodeMetadata | null;
   output: NodeOutput | null;
@@ -119,52 +119,10 @@ export interface NodeOutput {
 
 // For createNode - only structure fields
 export interface CreateNodeInput {
-  id: string;
+  uuid: string;
   type: NodeType;
+  title: string;
   inputs: NodeInputs;
   config: NodeConfig;
   asset?: AssetConfig;
-}
-
-// For updateNodeConfig
-export interface UpdateNodeConfigInput {
-  config: NodeConfig;
-}
-
-// For updateNodeType
-export interface UpdateNodeTypeInput {
-  type: NodeType;
-}
-
-// ============================================================================
-// Remotion Code Screen Types (for src/components/AnimatedCode.tsx)
-// ============================================================================
-
-export type TypingSpeed = "slow" | "normal" | "fast";
-
-export const CHARS_PER_SECOND: Record<TypingSpeed, number> = {
-  slow: 10,
-  normal: 15,
-  fast: 25
-};
-
-export interface TypeAction {
-  type: "type";
-  code: string;
-  speed: TypingSpeed | TypingSpeed[];
-  language?: string;
-}
-
-export interface PauseAction {
-  type: "pause";
-  duration: number;
-}
-
-export type Action = TypeAction | PauseAction;
-
-export interface SceneConfig {
-  title: string;
-  theme?: "dark" | "light";
-  backgroundColor?: string;
-  actions: Action[];
 }

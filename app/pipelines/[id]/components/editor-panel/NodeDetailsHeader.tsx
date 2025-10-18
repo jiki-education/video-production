@@ -15,7 +15,7 @@ interface NodeDetailsHeaderProps {
 
 const NODE_ICONS: Record<string, string> = {
   asset: "📄",
-  "talking-head": "👤",
+  "generate-talking-head": "👤",
   "render-code": "💻",
   "generate-animation": "🎬",
   "generate-voiceover": "🎙️",
@@ -33,10 +33,10 @@ export default function NodeDetailsHeader({ node }: NodeDetailsHeaderProps) {
         {/* Icon */}
         <span className="text-2xl flex-shrink-0">{icon}</span>
 
-        {/* Node ID and Type */}
+        {/* Node UUID and Type */}
         <div className="flex-1 min-w-0">
-          <div className="font-mono font-semibold text-sm text-gray-900 truncate" title={node.id}>
-            {node.id}
+          <div className="font-mono font-semibold text-sm text-gray-900 truncate" title={node.uuid}>
+            {node.uuid}
           </div>
           <div className="text-xs text-gray-600">{node.type}</div>
         </div>

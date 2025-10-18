@@ -40,12 +40,12 @@ export default function MixAudioNode({ data, selected }: MixAudioNodeProps) {
       <NodeOutputPreview node={node} />
 
       <div className="px-4 py-3 text-xs text-gray-600 space-y-1">
-        {node.config.mode != null && (
+        {node.provider === "ffmpeg" && node.config.audio_codec != null && (
           <div>
-            <span className="font-semibold">Mode:</span> {String(node.config.mode)}
+            <span className="font-semibold">Codec:</span> {String(node.config.audio_codec)}
           </div>
         )}
-        {node.config.volume != null && node.config.volume !== 0 && (
+        {node.provider === "ffmpeg" && node.config.volume != null && node.config.volume !== 0 && (
           <div>
             <span className="font-semibold">Volume:</span> {String(node.config.volume)}
           </div>

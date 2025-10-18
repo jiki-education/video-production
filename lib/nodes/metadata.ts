@@ -27,7 +27,7 @@ export const NODE_INPUT_CONFIG: Record<NodeType, Record<string, InputConfig>> = 
     // No inputs - assets are source nodes
   },
 
-  "talking-head": {
+  "generate-talking-head": {
     script: {
       maxConnections: 1,
       ordered: false,

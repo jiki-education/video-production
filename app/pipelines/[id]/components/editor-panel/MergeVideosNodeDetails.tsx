@@ -8,7 +8,7 @@
 
 import { useState, useMemo } from "react";
 import type { MergeVideosNode, Node } from "@/lib/nodes/types";
-import { reorderInputsAction } from "../../actions";
+import { reorderNodeInputs } from "@/lib/api-client";
 import { DndContext, closestCenter } from "@dnd-kit/core";
 import type { DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
@@ -17,20 +17,25 @@ import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 
 interface MergeVideosNodeDetailsProps {
   node: MergeVideosNode;
-  pipelineId: string;
+  pipelineUuid: string;
   allNodes: Node[]; // Pass all nodes to look up titles
   onRefresh: () => void; // Callback to refresh parent after reorder
 }
 
-export default function MergeVideosNodeDetails({ node, pipelineId, allNodes, onRefresh }: MergeVideosNodeDetailsProps) {
-  const [segments, setSegments] = useState<string[]>(node.inputs.segments || []);
+export default function MergeVideosNodeDetails({
+  node,
+  pipelineUuid,
+  allNodes,
+  onRefresh
+}: MergeVideosNodeDetailsProps) {
+  const [segments, setSegments] = useState<string[]>(node.inputs.segments);
   const [isReordering, setIsReordering] = useState(false);
 
   // Create a lookup map for node titles
   const nodeMap = useMemo(() => {
     const map = new Map<string, string>();
     allNodes.forEach((n) => {
-      map.set(n.id, n.title);
+      map.set(n.uuid, n.title);
     });
     return map;
   }, [allNodes]);
@@ -46,25 +51,23 @@ export default function MergeVideosNodeDetails({ node, pipelineId, allNodes, onR
     if (oldIndex === -1 || newIndex === -1) return;
 
     const newSegments = arrayMove(segments, oldIndex, newIndex);
-    const originalOrder = node.inputs.segments || [];
 
     // Optimistically update UI
     setSegments(newSegments);
     setIsReordering(true);
 
-    // Save to database
-    void reorderInputsAction(pipelineId, node.id, "segments", newSegments).then((result) => {
-      setIsReordering(false);
-
-      if (!result.success) {
-        // Rollback on error
-        setSegments(originalOrder);
-        alert(`Failed to reorder segments: ${result.error}`);
-      } else {
-        // Success - trigger parent refresh to update status
+    // Call Rails API to persist reordering
+    void reorderNodeInputs(pipelineUuid, node.uuid, "segments", newSegments)
+      .then(() => {
+        setIsReordering(false);
         onRefresh();
-      }
-    });
+      })
+      .catch((error: unknown) => {
+        setIsReordering(false);
+        setSegments(node.inputs.segments ?? []);
+        const errorMessage = error instanceof Error ? error.message : "Failed to reorder segments";
+        alert(`Failed to reorder segments: ${errorMessage}`);
+      });
   };
 
   return (
@@ -158,6 +161,7 @@ function SortableSegmentItem({
     <div
       ref={setNodeRef}
       style={style}
+      data-testid="segment-item"
       className={`
         flex items-center gap-3 bg-gray-50 px-3 py-2 rounded border border-gray-200
         cursor-move hover:bg-gray-100 transition-colors
@@ -178,7 +182,10 @@ function SortableSegmentItem({
       </div>
 
       {/* Segment Number */}
-      <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-blue-100 text-blue-700 text-xs font-semibold rounded">
+      <div
+        data-testid="segment-number"
+        className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-blue-100 text-blue-700 text-xs font-semibold rounded"
+      >
         {index + 1}
       </div>
 

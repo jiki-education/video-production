@@ -1,28 +1,80 @@
 /**
- * E2E Test Setup (Jest)
+ * E2E Test Setup (Jest + Puppeteer)
  *
- * Sets up database connection and migrations for E2E tests.
- * Each test runs in a transaction that is rolled back after completion.
+ * Intercepts API calls in the browser to return mock responses.
+ * This allows E2E tests to run without a real Rails API backend.
  */
 
-import { getTestPool, closeTestPool } from "@/test/helpers/db";
-import { createSchema } from "@/lib/db-migrations";
+// Mock API responses by intercepting fetch calls in browser
+export async function setupApiMocks() {
+  await page.evaluateOnNewDocument(() => {
+    const originalFetch = window.fetch;
+
+    window.fetch = async (url: RequestInfo | URL, init?: RequestInit) => {
+      const urlString = url.toString();
+
+      // Mock DELETE /nodes/:uuid
+      if (init?.method === "DELETE" && urlString.includes("/nodes/")) {
+        return new Response(null, { status: 204 });
+      }
+
+      // Mock PATCH /nodes/:uuid (for reorderNodeInputs and connectNodes)
+      if (init?.method === "PATCH" && urlString.includes("/nodes/")) {
+        // Extract node UUID from URL
+        const matches = urlString.match(/\/nodes\/([^?]+)/);
+        const nodeUuid = matches?.[1];
+
+        // Parse request body
+        const body = init.body !== undefined && init.body !== null ? JSON.parse(init.body as string) : {};
+
+        // Return updated node
+        return new Response(
+          JSON.stringify({
+            node: {
+              uuid: nodeUuid,
+              ...body.node
+            }
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          }
+        );
+      }
+
+      // Mock GET /nodes/:uuid (for connectNodes/reorderNodeInputs fetching current state)
+      if (init?.method === "GET" && urlString.includes("/nodes/") && !urlString.endsWith("/nodes")) {
+        // Extract node UUID from URL
+        const matches = urlString.match(/\/nodes\/([^?]+)/);
+        const nodeUuid = matches?.[1];
+
+        // Return minimal node data
+        return new Response(
+          JSON.stringify({
+            node: {
+              uuid: nodeUuid,
+              inputs: {}
+            }
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          }
+        );
+      }
+
+      // Pass through all other requests to original fetch
+      return originalFetch(url, init);
+    };
+  });
+}
 
 // Global setup - runs once before all tests
 beforeAll(async () => {
-  // Get test pool to initialize connection
-  const pool = getTestPool();
-
-  // Run database migrations
-  await createSchema(pool);
+  console.log("✓ E2E test environment initialized with API mocking");
 });
-
-// NOTE: E2E tests do NOT use transactions because the Next.js server
-// runs in a separate process and can't see uncommitted transaction data.
-// Instead, we use unique IDs per test and clean up after each test.
 
 // Global teardown - runs once after all tests
 afterAll(async () => {
-  // Close database connections
-  await closeTestPool();
+  console.log("✓ E2E tests completed");
 });

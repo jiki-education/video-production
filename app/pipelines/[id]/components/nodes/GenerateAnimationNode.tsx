@@ -40,14 +40,24 @@ export default function GenerateAnimationNode({ data, selected }: GenerateAnimat
       <NodeOutputPreview node={node} />
 
       <div className="px-4 py-3 text-xs text-gray-600 space-y-1">
-        {node.config.duration != null && node.config.duration !== 0 && (
+        {node.provider === "veo3" && node.config.aspect_ratio != null && (
           <div>
-            <span className="font-semibold">Duration:</span> {String(node.config.duration)}s
+            <span className="font-semibold">Aspect:</span> {String(node.config.aspect_ratio)}
           </div>
         )}
-        {node.config.aspectRatio != null && node.config.aspectRatio !== "" && (
+        {node.provider === "veo3" && node.config.model != null && (
           <div>
-            <span className="font-semibold">Aspect:</span> {String(node.config.aspectRatio)}
+            <span className="font-semibold">Model:</span> {String(node.config.model)}
+          </div>
+        )}
+        {node.provider === "runway" && node.config.generation != null && (
+          <div>
+            <span className="font-semibold">Generation:</span> {String(node.config.generation)}
+          </div>
+        )}
+        {node.metadata?.duration != null && (
+          <div>
+            <span className="font-semibold">Duration:</span> {String(node.metadata.duration)}s
           </div>
         )}
       </div>
