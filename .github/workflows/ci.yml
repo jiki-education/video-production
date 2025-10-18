@@ -18,7 +18,7 @@ jobs:
       - name: Checkout API repo (main branch)
         uses: actions/checkout@v4
         with:
-          repository: jiki-education/jiki
+          repository: jiki-education/api
           ref: main
           path: api
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -63,7 +63,7 @@ jobs:
       - name: Checkout API repo (main branch)
         uses: actions/checkout@v4
         with:
-          repository: jiki-education/jiki
+          repository: jiki-education/api
           ref: main
           path: api
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -108,7 +108,7 @@ jobs:
       - name: Checkout API repo (main branch)
         uses: actions/checkout@v4
         with:
-          repository: jiki-education/jiki
+          repository: jiki-education/api
           ref: main
           path: api
           token: ${{ secrets.GITHUB_TOKEN }}
